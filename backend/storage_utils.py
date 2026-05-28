@@ -6,8 +6,11 @@ from pypdf import PdfReader
 
 KEY_PATH = os.getenv("FIREBASE_KEY_PATH", "/secrets/firebase_key.json")
 BUCKET_NAME = os.getenv("FIREBASE_STORAGE_BUCKET", "devils-advocate-ec48b.firebasestorage.app")
+MOCK_SERVICES = os.getenv("MOCK_SERVICES") == "1"
 
 def _get_client():
+    if MOCK_SERVICES:
+        raise RuntimeError("Firebase Storage is disabled in MOCK_SERVICES mode.")
     creds = service_account.Credentials.from_service_account_file(KEY_PATH)
     return storage.Client(credentials=creds, project=creds.project_id)
 
@@ -35,6 +38,9 @@ def download_and_extract(document_paths: list[str]) -> tuple[list[str], list[dic
     Returns (texts, metadatas) ready for chroma ingest.
     """
     if not document_paths:
+        return [], []
+    if MOCK_SERVICES:
+        print("[Storage] MOCK_SERVICES=1; skipping Firebase document download.")
         return [], []
 
     client = _get_client()
@@ -80,6 +86,8 @@ def download_and_extract(document_paths: list[str]) -> tuple[list[str], list[dic
 
 def delete_user_files(uid: str) -> None:
     """Delete all files for a user — called at session end for anonymous users."""
+    if MOCK_SERVICES:
+        return
     try:
         client = _get_client()
         bucket = client.bucket(BUCKET_NAME)

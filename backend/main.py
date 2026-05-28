@@ -38,6 +38,7 @@ MAX_SESSION_DURATION = 20 * 60  # 20 minutes
 MIN_TURNS_FOR_REPORT = 2  # require at least 2 user and 2 agent turns to generate report
 
 load_dotenv()
+MOCK_SERVICES = os.getenv("MOCK_SERVICES") == "1"
 
 # ── App setup ──────────────────────────────────────────────────────
 app = FastAPI()
@@ -69,6 +70,14 @@ app.add_middleware(CORSMiddleware,
 # { socket_id: { gemini: GeminiLiveClient, state: SessionState, judges: dict[str, OpenAIClient] } }
 sessions = {}
 last_retrieval = {}
+
+def verify_id_token(id_token: str):
+    if MOCK_SERVICES:
+        return {
+            "uid": "demo-user",
+            "firebase": {"sign_in_provider": "anonymous"},
+        }
+    return fb_auth.verify_id_token(id_token)
 
 # ── Socket events ──────────────────────────────────────────────────
 @sio.event
@@ -146,7 +155,7 @@ async def start_session(sid, data):
     await sio.emit('session_status', {'step': 'Authenticating...'}, to=sid)
     id_token = data.get('idToken', '')
     try:
-        decoded = fb_auth.verify_id_token(id_token)
+        decoded = verify_id_token(id_token)
         uid = decoded['uid']
         is_anonymous = decoded.get('firebase', {}).get('sign_in_provider') == 'anonymous'
     except Exception:
@@ -468,7 +477,7 @@ async def session_feedback(request: Request):
         return JSONResponse(status_code=400, content={"error": "Invalid JSON"})
 
     try:
-        decoded = fb_auth.verify_id_token(payload.idToken)
+        decoded = verify_id_token(payload.idToken)
         uid = decoded["uid"]
     except Exception:
         return JSONResponse(status_code=401, content={"error": "Authentication failed."})
@@ -483,8 +492,10 @@ async def session_feedback(request: Request):
 
     return JSONResponse(content={"ok": True})
 
-# ── REST: extract a claim summary from uploaded documents ──────────
-_genai = genai_client.Client(api_key=os.getenv("GEMINI_API_KEY"))
+def get_genai_client():
+    if MOCK_SERVICES:
+        return None
+    return genai_client.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 @app.post("/extract_claim")
 async def extract_claim(request: Request):
@@ -497,7 +508,7 @@ async def extract_claim(request: Request):
     document_paths = data.get("documentPaths", [])
 
     try:
-        decoded = fb_auth.verify_id_token(id_token)
+        decoded = verify_id_token(id_token)
         uid = decoded['uid']
     except Exception:
         return JSONResponse(status_code=401, content={"error": "Authentication failed."})
@@ -534,6 +545,8 @@ async def extract_claim(request: Request):
     words = combined.split()
     if len(words) > word_limit:
         combined = " ".join(words[:word_limit])
+    if MOCK_SERVICES:
+        return JSONResponse(content={"claim": "Mock document claim generated from local demo mode."})
 
     prompt = (
         "Summarize the following startup or business document into 2-3 sentences "
@@ -545,7 +558,7 @@ async def extract_claim(request: Request):
     try:
         response = await asyncio.get_event_loop().run_in_executor(
             None,
-            lambda: _genai.models.generate_content(
+            lambda: get_genai_client().models.generate_content(
                 model="gemini-3.1-flash-lite-preview",
                 contents=prompt,
             )

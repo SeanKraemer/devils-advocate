@@ -3,18 +3,24 @@ from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-# Init once
+MOCK_SERVICES = os.getenv("MOCK_SERVICES") == "1"
 key_path = os.getenv("FIREBASE_KEY_PATH", "/secrets/firebase_key.json")
-cred = credentials.Certificate(key_path)
 
-firebase_admin.initialize_app(cred)
-db = firestore.client()
+if MOCK_SERVICES or not os.path.exists(key_path):
+    db = None
+else:
+    cred = credentials.Certificate(key_path)
+    firebase_admin.initialize_app(cred)
+    db = firestore.client()
 
 def _now():
     return datetime.utcnow()
 
 
 def save_post_debate_feedback(session_id: str, uid: str, feedback: dict):
+    if db is None:
+        return
+
     ref = db.collection("sessions").document(session_id)
     snapshot = ref.get()
     session_doc = snapshot.to_dict() if snapshot else None
@@ -36,6 +42,12 @@ def save_post_debate_feedback(session_id: str, uid: str, feedback: dict):
 class SessionLogger:
     def __init__(self, session_id: str, user_claim: str, uid: str = None, is_anonymous: bool = True, stage: str = "late"):
         self.session_id = session_id
+        if db is None:
+            self.ref = None
+            self._strength_sum = 0
+            self._strength_count = 0
+            return
+
         self.ref = db.collection("sessions").document(session_id)
         self.ref.set({
             "session_id": session_id,
@@ -67,6 +79,8 @@ class SessionLogger:
         self._strength_count = 0
 
     def log_turn(self, speaker: str, text: str, turn_index: int):
+        if self.ref is None:
+            return
         self.ref.update({
             "turns": firestore.ArrayUnion([{
                 "speaker": speaker,
@@ -79,14 +93,21 @@ class SessionLogger:
         })
 
     def log_judge(self, result: dict):
+        if self.ref is None:
+            return
         self.ref.update({
             "judge_result": result
         })
 
     def log_voice(self, voice_name: str):
+        if self.ref is None:
+            return
         self.ref.update({"voice": voice_name})
 
     def log_judge_update(self, event: dict):
+        if self.ref is None:
+            return
+
         classification = event.get("classification", "").lower()
         strength = event.get("strength", 0)
 
@@ -118,14 +139,20 @@ class SessionLogger:
         self.ref.update(update)
 
     def log_interruption(self):
+        if self.ref is None:
+            return
         self.ref.update({
             "metrics.interruption_count": firestore.Increment(1)
         })
 
     def log_report(self, report: dict):
+        if self.ref is None:
+            return
         self.ref.update({"report": report})
 
     def finalize(self, consent_given: bool):
+        if self.ref is None:
+            return
         self.ref.update({
             "ended_at": _now(),
             "consent_given": consent_given,

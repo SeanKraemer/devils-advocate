@@ -2,7 +2,8 @@ import os
 from google import genai
 from google.genai import types
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+MOCK_SERVICES = os.getenv("MOCK_SERVICES") == "1"
+client = None if MOCK_SERVICES else genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 MAX_INPUT_CHARS = 8000
 
@@ -19,6 +20,9 @@ async def summarize_documents(doc_texts: list[str]) -> str:
         raise ValueError("Document text is empty")
     if len(combined) > MAX_INPUT_CHARS:
         combined = combined[:MAX_INPUT_CHARS] + "..."
+    if MOCK_SERVICES:
+        first_sentence = combined.split(".")[0].strip()
+        return first_sentence[:300] if first_sentence else "Mock document summary."
 
     prompt = f"""The following is extracted text from a founder's pitch deck, business plan, or notes.
 Summarize their idea in 1-3 clear sentences: what they're building, for whom, and the core hypothesis or business model.
