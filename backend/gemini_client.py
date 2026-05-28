@@ -6,8 +6,9 @@ from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
+MOCK_SERVICES = os.getenv("MOCK_SERVICES") == "1"
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+client = None if MOCK_SERVICES else genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 MODEL = "gemini-2.5-flash-native-audio-latest"
 
 class GeminiLiveClient:
@@ -28,6 +29,14 @@ class GeminiLiveClient:
         self._agent_transcript_buffer = ""
 
     async def connect(self):
+        if MOCK_SERVICES:
+            self.running = True
+            if self.on_text:
+                await self.on_text(
+                    "Mock debate engine is running locally. Configure GEMINI_API_KEY for live audio responses.",
+                    partial=False,
+                )
+            return
         config = types.LiveConnectConfig(
             response_modalities=["AUDIO"],
             system_instruction=self.system_prompt,
@@ -127,6 +136,8 @@ class GeminiLiveClient:
 
     async def close(self):
         self.running = False
+        if MOCK_SERVICES:
+            return
         if self._task:
             self._task.cancel()
             try:

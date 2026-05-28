@@ -4,7 +4,8 @@ load_dotenv()
 import asyncio
 import re
 from session_state import SessionState
-from report import generate_report, run_judge
+from judges import build_judge_panel, run_judge_panel
+from report import generate_report
 
 async def with_retry(coro_fn, max_retries=2):
     for attempt in range(max_retries + 1):
@@ -43,7 +44,7 @@ async def main():
 
     print("Running judge...")
     try:
-        judge_result = await with_retry(lambda: run_judge(state))
+        judge_result = await with_retry(lambda: run_judge_panel(build_judge_panel("late"), state))
     except Exception as e:
         print(f"Judge failed after retries: {e}")
 
@@ -67,4 +68,5 @@ async def main():
     else:
         print("✓ debate_report would be emitted with None — spinner resolves")
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
