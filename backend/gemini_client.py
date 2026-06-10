@@ -9,7 +9,28 @@ load_dotenv()
 MOCK_SERVICES = os.getenv("MOCK_SERVICES") == "1"
 
 client = None if MOCK_SERVICES else genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-MODEL = "gemini-2.5-flash-native-audio-latest"
+MODEL = os.getenv("GEMINI_LIVE_MODEL", "gemini-2.5-flash-native-audio-preview-12-2025")
+
+
+class MockGeminiSession:
+    def __init__(self, debate_client):
+        self.debate_client = debate_client
+        self.turn_count = 0
+
+    async def send_client_content(self, turns, turn_complete=True):
+        if not turn_complete:
+            return
+        user_text = ""
+        for turn in turns or []:
+            for part in turn.get("parts", []):
+                user_text = part.get("text", user_text)
+        if not user_text.strip():
+            return
+        self.turn_count += 1
+        await self.debate_client.on_text(
+            self.debate_client.mock_response(user_text, self.turn_count),
+            partial=False,
+        )
 
 class GeminiLiveClient:
     def __init__(self, system_prompt: str, on_text: callable, on_audio: callable, on_user_text: callable = None, on_reasoning: callable = None, on_grounding: callable = None, on_interrupted: callable = None, on_error: callable = None, voice_name="Charon"):
@@ -31,11 +52,7 @@ class GeminiLiveClient:
     async def connect(self):
         if MOCK_SERVICES:
             self.running = True
-            if self.on_text:
-                await self.on_text(
-                    "Mock debate engine is running locally. Configure GEMINI_API_KEY for live audio responses.",
-                    partial=False,
-                )
+            self.session = MockGeminiSession(self)
             return
         config = types.LiveConnectConfig(
             response_modalities=["AUDIO"],
@@ -57,6 +74,8 @@ class GeminiLiveClient:
         self._task = asyncio.create_task(self._listen())
 
     async def send_audio(self, audio_bytes: bytes):
+        if MOCK_SERVICES:
+            return
         if not self.session or not self.running:
             return
         try:
@@ -68,6 +87,31 @@ class GeminiLiveClient:
             self.running = False
             if self.on_error:
                 await self.on_error("Connection to debate engine lost. Please end and start a new session.")
+
+    async def send_text(self, text: str):
+        if not self.session or not self.running or not text.strip():
+            return
+        try:
+            await self.session.send_client_content(
+                turns=[{"role": "user", "parts": [{"text": text}]}],
+                turn_complete=True,
+            )
+        except Exception as e:
+            print(f"Text send error: {e}")
+            self.running = False
+            if self.on_error:
+                await self.on_error("Connection to debate engine lost. Please end and start a new session.")
+
+    def mock_response(self, user_text: str, turn_count: int) -> str:
+        templates = [
+            "Let me pressure-test that. What evidence proves this is a painful buying problem instead of a nice-to-have?",
+            "That answer still leans on intent, not behavior. What have users actually paid, abandoned, or switched from?",
+            "Your risk is distribution. Name the first channel that repeatedly reaches this buyer without founder-led handholding.",
+            "Assume a better-funded incumbent copies the feature. What remains defensible after price, trust, and integration advantages are gone?",
+        ]
+        if turn_count <= 1:
+            return templates[0]
+        return templates[(turn_count - 1) % len(templates)]
 
     async def _listen(self):
         

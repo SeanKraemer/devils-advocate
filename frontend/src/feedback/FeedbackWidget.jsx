@@ -82,7 +82,7 @@ const MOST_VALUABLE_PART_OPTIONS = [
     { value: 'weaknesses_exposed', label: 'Seeing weaknesses exposed' },
     { value: 'judge_scorecard', label: 'Judge scorecard' },
     { value: 'written_report_next_steps', label: 'Written report / next steps' },
-    { value: 'transcript_claim_tracker', label: 'Transcript / claim tracker' },
+    { value: 'transcript_judge_timeline', label: 'Transcript / judge timeline' },
     { value: 'other', label: 'Other' },
 ]
 
@@ -387,10 +387,10 @@ export function FeedbackWidget({ sessionId, user, consentGiven, hasReport }) {
                     <span style={{ fontSize: 14 }}>🔒</span>
                     <div>
                         <div style={{ ...mono, color: colors.textMuted, marginBottom: spacing.xs }}>
-                            Research feedback unavailable
+                            Feedback unavailable
                         </div>
                         <p style={{ ...serif, color: colors.textGhost, margin: 0, lineHeight: 1.5 }}>
-                            Research sharing was turned off during this debate, so this session’s survey responses will not be stored either.
+                            Session storage was turned off during this debate, so feedback responses will not be stored either.
                         </p>
                     </div>
                 </div>
@@ -402,7 +402,7 @@ export function FeedbackWidget({ sessionId, user, consentGiven, hasReport }) {
         return (
             <div style={containerStyle}>
                 <p style={{ ...serif, color: colors.textGhost, margin: 0, lineHeight: 1.5 }}>
-                    Feedback is unavailable because this session does not have an active research record.
+                    Feedback is unavailable because this session does not have an active feedback record.
                 </p>
             </div>
         )
@@ -414,7 +414,7 @@ export function FeedbackWidget({ sessionId, user, consentGiven, hasReport }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
                     <span style={{ fontSize: 14 }}>✓</span>
                     <span style={{ ...mono, color: colors.success }}>
-                        Thanks — research feedback recorded
+                        Thanks - feedback recorded
                     </span>
                 </div>
             </div>
@@ -431,10 +431,10 @@ export function FeedbackWidget({ sessionId, user, consentGiven, hasReport }) {
                 >
                     <div>
                         <div style={{ ...mono, color: colors.textMuted, marginBottom: 4 }}>
-                            Study feedback
+                            Product feedback
                         </div>
                         <p style={{ ...serif, color: colors.textGhost, margin: 0, lineHeight: 1.5 }}>
-                            Help us evaluate idea impact, voice usability, and report quality. About 2-3 minutes.
+                            Help evaluate idea impact, voice usability, and report quality. About 2-3 minutes.
                         </p>
                     </div>
                     <span style={{ ...mono, color: colors.textFaint, fontSize: 10 }}>OPEN</span>
@@ -452,7 +452,7 @@ export function FeedbackWidget({ sessionId, user, consentGiven, hasReport }) {
             >
                 <div>
                     <div style={{ ...mono, color: colors.textMuted, marginBottom: 4 }}>
-                        Study feedback
+                        Product feedback
                     </div>
                     <p style={{ ...serif, color: colors.textGhost, margin: 0, lineHeight: 1.5 }}>
                         Short post-debate survey focused on the debate experience, live voice flow, and report usefulness.
@@ -547,7 +547,7 @@ export function FeedbackWidget({ sessionId, user, consentGiven, hasReport }) {
             />
 
             <TextAreaField
-                prompt="If one thing should change before the next study session, what should it be? Optional."
+                prompt="If one thing should change before the next session, what should it be? Optional."
                 placeholder="One concrete change that would improve the experience."
                 value={oneThingToChange}
                 onChange={setOneThingToChange}
@@ -613,7 +613,7 @@ export function FeedbackWidget({ sessionId, user, consentGiven, hasReport }) {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md }}>
                 <p style={{ ...serif, color: colors.textGhost, margin: 0, lineHeight: 1.5 }}>
-                    Responses are stored with this session’s research record only.
+                    Responses are stored with this session's feedback record only.
                 </p>
                 <button
                     type="button"

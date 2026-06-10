@@ -10,7 +10,8 @@ backend/venv/
 backend/__pycache__/
 .DS_Store
 firebase_key.json
+firebase_info*.json
 .firebase/
-.firebaserc
 dist/
 frontend/dist/
+AGENTS.md

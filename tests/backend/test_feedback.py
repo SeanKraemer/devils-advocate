@@ -1,9 +1,10 @@
 import importlib
+import os
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from feedback import FEEDBACK_VERSION, StudyFeedback, build_feedback_record
+from feedback import FEEDBACK_VERSION, ProductFeedback, build_feedback_record
 
 
 def make_feedback_payload(report_available=True):
@@ -48,7 +49,7 @@ def make_feedback_payload(report_available=True):
 
 class TestFeedbackRecord:
     def test_build_feedback_record_adds_indices(self):
-        record = build_feedback_record(StudyFeedback.model_validate(
+        record = build_feedback_record(ProductFeedback.model_validate(
             make_feedback_payload(report_available=True)
         ))
 
@@ -67,7 +68,8 @@ class TestFeedbackApi:
             "user": {"uid": "user123", "is_anonymous": True},
         }
 
-        with patch("firebase_admin.initialize_app"), \
+        with patch.dict(os.environ, {"MOCK_SERVICES": "0", "FIREBASE_KEY_PATH": __file__}), \
+             patch("firebase_admin.initialize_app"), \
              patch("firebase_admin.credentials.Certificate"), \
              patch("firebase_admin.firestore.client", return_value=fake_db), \
              patch("firebase_admin.firestore.ArrayUnion", side_effect=lambda x: x), \
@@ -101,7 +103,8 @@ class TestFeedbackApi:
             "user": {"uid": "user123", "is_anonymous": True},
         }
 
-        with patch("firebase_admin.initialize_app"), \
+        with patch.dict(os.environ, {"MOCK_SERVICES": "0", "FIREBASE_KEY_PATH": __file__}), \
+             patch("firebase_admin.initialize_app"), \
              patch("firebase_admin.credentials.Certificate"), \
              patch("firebase_admin.firestore.client", return_value=fake_db), \
              patch("firebase_admin.firestore.ArrayUnion", side_effect=lambda x: x), \
@@ -118,10 +121,10 @@ class TestFeedbackApi:
                 "idToken": "fake-token",
                 "sessionId": "session_002",
                 "feedback": make_feedback_payload(report_available=False),
-            })
+        })
 
         assert response.status_code == 403
-        assert "consent" in response.json()["error"].lower()
+        assert "disabled" in response.json()["error"].lower()
 
     def test_session_feedback_rejects_invalid_hurdle_mix(self, mock_firestore_db):
         fake_db, store = mock_firestore_db
@@ -133,7 +136,8 @@ class TestFeedbackApi:
         payload = make_feedback_payload(report_available=False)
         payload["voice_experience"]["hurdles"] = ["nothing_major", "turn_taking"]
 
-        with patch("firebase_admin.initialize_app"), \
+        with patch.dict(os.environ, {"MOCK_SERVICES": "0", "FIREBASE_KEY_PATH": __file__}), \
+             patch("firebase_admin.initialize_app"), \
              patch("firebase_admin.credentials.Certificate"), \
              patch("firebase_admin.firestore.client", return_value=fake_db), \
              patch("firebase_admin.firestore.ArrayUnion", side_effect=lambda x: x), \

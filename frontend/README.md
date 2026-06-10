@@ -13,4 +13,4 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-The frontend is deployed with Firebase Hosting and talks to the FastAPI + Socket.IO backend defined in the repo root documentation.
+The portfolio demo runs with `VITE_DEMO_MODE=1` and talks to the mock-backed FastAPI + Socket.IO service. See the root README for live Firebase setup and deployment notes.

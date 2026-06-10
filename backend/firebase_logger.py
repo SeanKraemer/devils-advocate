@@ -26,9 +26,9 @@ def save_post_debate_feedback(session_id: str, uid: str, feedback: dict):
     session_doc = snapshot.to_dict() if snapshot else None
 
     if not session_doc:
-        raise ValueError("Session not found or research data was discarded.")
+        raise ValueError("Session not found or feedback data was discarded.")
     if session_doc.get("consent_given") is not True:
-        raise PermissionError("Research consent is disabled for this session.")
+        raise PermissionError("Feedback storage is disabled for this session.")
     if session_doc.get("user", {}).get("uid") != uid:
         raise PermissionError("You do not have access to this session.")
 
@@ -159,6 +159,6 @@ class SessionLogger:
         })
         if not consent_given:
             self.ref.delete()
-            print(f"[Firebase] Session {self.session_id} deleted — no consent")
+            print(f"[Firebase] Session {self.session_id} deleted because storage was disabled")
         else:
             print(f"[Firebase] Session {self.session_id} logged")

@@ -160,6 +160,7 @@ const card = {
 }
 
 const CLAIM_CHARACTER_LIMIT = 750
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === '1'
 
 // ── Small reusable components ──────────────────────────────────
 function Spinner() {
@@ -492,6 +493,70 @@ function MicDictation({ onTranscript, onInterim }) {
   )
 }
 
+function TextTurnComposer({ onSend, disabled, pending }) {
+  const [text, setText] = useState('')
+
+  function submit() {
+    const clean = text.trim()
+    if (!clean || disabled) return
+    onSend(clean)
+    setText('')
+  }
+
+  return (
+    <div style={{
+      ...card,
+      marginTop: spacing.lg,
+      padding: spacing.lg,
+      borderLeft: `3px solid ${colors.info}`,
+    }}>
+      <SectionLabel color={colors.info}>Your Response</SectionLabel>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value.slice(0, CLAIM_CHARACTER_LIMIT))}
+        onKeyDown={(e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit()
+        }}
+        placeholder="Defend your idea, concede a weak point, or sharpen the pitch..."
+        rows={3}
+        disabled={disabled}
+        style={{
+          width: '100%',
+          padding: spacing.md,
+          borderRadius: radius.md,
+          background: colors.bgDeep,
+          color: colors.textPrimary,
+          border: `1px solid ${colors.borderSubtle}`,
+          fontSize: font.md,
+          ...serif,
+          resize: 'vertical',
+          boxSizing: 'border-box',
+          lineHeight: 1.5,
+        }}
+      />
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: spacing.md,
+        marginTop: spacing.sm,
+      }}>
+        <span style={{ ...mono, color: colors.textGhost }}>
+          {CLAIM_CHARACTER_LIMIT - text.length} remaining
+        </span>
+        <GhostBtn
+          onClick={submit}
+          color={text.trim() && !disabled ? colors.info : colors.textGhost}
+          borderColor={text.trim() && !disabled ? colors.info : colors.borderSubtle}
+          style={{ opacity: pending ? 0.7 : 1 }}
+        >
+          {pending ? 'Sending...' : 'Send Turn'}
+        </GhostBtn>
+      </div>
+    </div>
+  )
+}
+
 // ── Main App ───────────────────────────────────────────────────
 export default function App() {
   const { user, authReady, signInWithGoogle, signInWithGitHub, handleSignOut } = useAuth()
@@ -499,7 +564,8 @@ export default function App() {
   const {
     status, transcript, partials, claims, report, judgeResult,
     isAgentSpeaking, isPaused, consentGiven, sessionStatus, micVolume, reportReady, sessionId,
-    startDebate, endDebate, resetSession, togglePause,
+    textTurnPending,
+    startDebate, sendTextTurn, endDebate, resetSession, togglePause,
     handleConsentToggle, exportToPDF,
   } = useDebateSession()
 
@@ -536,7 +602,9 @@ export default function App() {
 
   async function handleStartDebate() {
     if (!authReady || !user) return alert('Auth not ready yet, try again')
-    if (!claim.trim() && uploadedFiles.length === 0) return alert('Enter your position or upload documents to get started.')
+    if (!claim.trim() && (!uploadedFiles.length || DEMO_MODE)) {
+      return alert(DEMO_MODE ? 'Enter your position to start the demo.' : 'Enter your position or upload documents to get started.')
+    }
     agentHasSpokenRef.current = false
     await startDebate(claim.trim() || '', user, uploadedFiles, stage)
   }
@@ -600,7 +668,7 @@ export default function App() {
   }
 
   // ── Knowledge base panel ───────────────────────────────────────
-  const knowledgeBasePanel = authReady && user && (
+  const knowledgeBasePanel = !DEMO_MODE && authReady && user && (
     <div style={{ marginTop: spacing.lg }}>
       <div style={{ ...mono, color: colors.textPrimary, fontSize: font.sm, letterSpacing: 2, textTransform: 'uppercase', marginBottom: spacing.sm }}>
         Your Knowledge Base
@@ -736,7 +804,9 @@ export default function App() {
 
         {authReady && (
           <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-            {user?.isAnonymous ? (
+            {DEMO_MODE ? (
+              <span style={{ ...mono, color: colors.info }}>Demo mode</span>
+            ) : user?.isAnonymous ? (
               <>
                 <span style={{ ...mono, color: colors.textFaint }}>Guest</span>
                 <GhostBtn onClick={signInWithGoogle} color={colors.info}>Google</GhostBtn>
@@ -787,9 +857,12 @@ export default function App() {
                 </span>
               </h1>
               <p style={{ ...mono, color: colors.textPrimary, lineHeight: 1.6, marginBottom: spacing.lg }}>
-                State your position or upload documents below — the Devil's Advocate will do the rest.
+                {DEMO_MODE
+                  ? "State your position - the Devil's Advocate demo will do the rest."
+                  : "State your position or upload documents below - the Devil's Advocate will do the rest."}
               </p>
 
+              {!DEMO_MODE && (
               <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }}>
                 <span style={{ ...mono, color: colors.textFaint, fontSize: font.xs }}>
                   Prefer to speak it out?
@@ -802,6 +875,7 @@ export default function App() {
                   onInterim={setInterimText}
                 />
               </div>
+              )}
 
               <textarea
                 value={interimText ? `${claim} ${interimText}` : claim}
@@ -921,7 +995,7 @@ export default function App() {
 
               <div style={{ display: 'flex', gap: spacing.md, marginTop: spacing.lg, alignItems: 'center', justifyContent: 'center' }}>
                 <PrimaryBtn onClick={handleStartDebate}>
-                  <span>🎤</span> START DEBATE
+                  <span>{DEMO_MODE ? '⌨' : '🎤'}</span> {DEMO_MODE ? 'START DEMO' : 'START DEBATE'}
                 </PrimaryBtn>
                 {(judgeResult || report) && (
                   <GhostBtn
@@ -987,7 +1061,10 @@ export default function App() {
 
               {showOnboarding && (
                 <div style={{ marginBottom: spacing.md }}>
-                  <OnboardingBanner onDismiss={() => setShowOnboarding(false)} />
+                  <OnboardingBanner
+                    inputMode={DEMO_MODE ? 'text' : 'voice'}
+                    onDismiss={() => setShowOnboarding(false)}
+                  />
                 </div>
               )}
 
@@ -996,12 +1073,23 @@ export default function App() {
                   isAgentSpeaking={isAgentSpeaking}
                   isPaused={isPaused}
                   agentHasSpoken={agentHasSpokenRef.current}
+                  inputMode={DEMO_MODE ? 'text' : 'voice'}
                 />
               </div>
+              {!DEMO_MODE && (
               <div style={{ marginBottom: spacing.lg }}>
                 <MicStatusBar volume={micVolume} isPaused={isPaused} />
               </div>
+              )}
               <AgentSpeakingBadge isAgentSpeaking={isAgentSpeaking} />
+
+              {DEMO_MODE && (
+                <TextTurnComposer
+                  onSend={sendTextTurn}
+                  disabled={isPaused}
+                  pending={textTurnPending}
+                />
+              )}
 
               {knowledgeBasePanel}
 
@@ -1043,7 +1131,8 @@ export default function App() {
                 </div>
               )}
 
-              {/* Consent toggle */}
+              {/* Storage toggle */}
+              {!DEMO_MODE && (
               <button onClick={() => {
                 const label = document.getElementById('consent-label')
                 const scan = document.getElementById('consent-scan')
@@ -1067,17 +1156,17 @@ export default function App() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: spacing.sm }}>
                   <span style={{ fontSize: 14, marginTop: 1, flexShrink: 0 }}>
-                    {consentGiven ? '🔬' : '🔒'}
+                    {consentGiven ? '✓' : '🔒'}
                   </span>
                   <div>
                     <p style={{ margin: 0, ...mono, color: consentGiven ? colors.success : colors.textMuted }}>
-                      {consentGiven ? 'SHARING session data for research' : 'NOT sharing session data for research'}
+                      {consentGiven ? 'Saving session data for feedback' : 'Not saving session data'}
                     </p>
                     <p style={{
                       margin: '3px 0 0', fontSize: font.xs,
                       color: colors.textGhost, ...serif, lineHeight: 1.4,
                     }}>
-                      Your transcript, claim data, and audio may be stored and used for academic research. Toggle off to discard all data at session end.
+                      Your transcript, claim data, and feedback may be saved for product iteration. Toggle off to discard all data at session end.
                     </p>
                   </div>
                 </div>
@@ -1134,7 +1223,7 @@ export default function App() {
                       zIndex: 1,
                     }}
                   >
-                    {consentGiven ? '[DECLASSIFIED]' : '[REDACTED]'}
+                    {consentGiven ? '[SAVED]' : '[DISCARDED]'}
                   </span>
                   {consentGiven && (
                     <span style={{
@@ -1146,6 +1235,7 @@ export default function App() {
                   )}
                 </div>
               </button>
+              )}
 
               {/* Controls */}
               <div style={{ display: 'flex', gap: spacing.md, marginTop: spacing.lg }}>
@@ -1381,12 +1471,14 @@ export default function App() {
 
               </div>
 
-              <FeedbackWidget
-                sessionId={sessionId}
-                user={user}
-                consentGiven={consentGiven}
-                hasReport={Boolean(report)}
-              />
+              {!DEMO_MODE && (
+                <FeedbackWidget
+                  sessionId={sessionId}
+                  user={user}
+                  consentGiven={consentGiven}
+                  hasReport={Boolean(report)}
+                />
+              )}
 
               <div style={{ display: 'flex', gap: spacing.md, marginTop: spacing.lg }}>
                 {(judgeResult || report) && (

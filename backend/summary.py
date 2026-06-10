@@ -4,6 +4,7 @@ from google.genai import types
 
 MOCK_SERVICES = os.getenv("MOCK_SERVICES") == "1"
 client = None if MOCK_SERVICES else genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash-lite")
 
 MAX_INPUT_CHARS = 8000
 
@@ -35,7 +36,7 @@ DOCUMENT TEXT:
 
     try:
         response = await client.aio.models.generate_content(
-            model="gemini-3.1-flash-lite-preview",
+            model=GEMINI_TEXT_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
                 max_output_tokens=300,

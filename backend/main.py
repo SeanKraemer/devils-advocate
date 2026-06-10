@@ -39,28 +39,36 @@ MIN_TURNS_FOR_REPORT = 2  # require at least 2 user and 2 agent turns to generat
 
 load_dotenv()
 MOCK_SERVICES = os.getenv("MOCK_SERVICES") == "1"
+APP_ENV = os.getenv("APP_ENV", "local")
+PUBLIC_APP_URL = os.getenv("PUBLIC_APP_URL", "").strip()
+GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash-lite")
+
+
+def _allowed_origins() -> list[str]:
+    configured = [
+        origin.strip()
+        for origin in os.getenv("ALLOWED_ORIGINS", "").split(",")
+        if origin.strip()
+    ]
+    defaults = ["http://localhost:5173", "http://localhost"]
+    origins = [*configured, *defaults]
+    if PUBLIC_APP_URL:
+        origins.append(PUBLIC_APP_URL)
+    return list(dict.fromkeys(origins))
+
+
+ALLOWED_ORIGINS = _allowed_origins()
 
 # ── App setup ──────────────────────────────────────────────────────
 app = FastAPI()
 sio = socketio.AsyncServer(
     async_mode='asgi',
-    cors_allowed_origins=[
-        'https://devils-advocate-ec48b.web.app',
-        'https://devils-advocate-ec48b.firebaseapp.com',
-        'https://devils-advocate-488918.web.app',
-        'http://localhost:5173',
-        'http://localhost'
-    ]
+    cors_allowed_origins=ALLOWED_ORIGINS,
 )
 socket_app = socketio.ASGIApp(sio, app)
 
 app.add_middleware(CORSMiddleware,
-    allow_origins=[
-        'https://devils-advocate-ec48b.web.app',
-        'https://devils-advocate-ec48b.firebaseapp.com',
-        'https://devils-advocate-488918.web.app',
-        'http://localhost:5173'
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
@@ -205,31 +213,34 @@ async def start_session(sid, data):
                 except Exception as e:
                     print(f"Logging error (on_text): {e}")
 
+        async def record_user_turn(text):
+            state.add_turn('user', text)
+            await sio.emit('transcript', {'speaker': 'user', 'text': text}, to=sid)
+            try:
+                logger.log_turn('user', text, state.turn_count)
+            except Exception as e:
+                print(f"Logging error (record_user_turn): {e}")
+
+            async def _judge_turn(user_text):
+                judges = sessions.get(sid, {}).get('judges')
+                if not judges:
+                    return
+                result = await run_live_judge_update(judges, state, user_text)
+                if result:
+                    state.add_judge_update(user_text, result)
+                    await sio.emit('claim_update', result, to=sid)
+                    try:
+                        logger.log_judge_update(result)
+                    except Exception as e:
+                        print(f"Logging error (_judge_turn): {e}")
+
+            asyncio.create_task(_judge_turn(text))
+
         async def on_user_text(text, partial=False):
             if partial:
                 await sio.emit('transcript_partial', {'speaker': 'user', 'text': text}, to=sid)
             else:
-                state.add_turn('user', text)
-                await sio.emit('transcript', {'speaker': 'user', 'text': text}, to=sid)
-                try:
-                    logger.log_turn('user', text, state.turn_count)
-                except Exception as e:
-                    print(f"Logging error (on_user_text): {e}")
-
-                async def _judge_turn(user_text):
-                    judges = sessions.get(sid, {}).get('judges')
-                    if not judges:
-                        return
-                    result = await run_live_judge_update(judges, state, user_text)
-                    if result:
-                        state.add_judge_update(user_text, result)
-                        await sio.emit('claim_update', result, to=sid)
-                        try:
-                            logger.log_judge_update(result)
-                        except Exception as e:
-                            print(f"Logging error (_judge_turn): {e}")
-
-                asyncio.create_task(_judge_turn(text))
+                await record_user_turn(text)
 
         async def on_reasoning(text):
             #await sio.emit('transcript', {'speaker': 'reasoning', 'text': text}, to=sid)
@@ -318,6 +329,7 @@ async def start_session(sid, data):
             'is_anonymous': is_anonymous,
             'document_paths': document_paths,
             'logger': logger,
+            'record_user_turn': record_user_turn,
             'started_at': time.time(),
             'consent': True,
             'paused': False,
@@ -327,10 +339,7 @@ async def start_session(sid, data):
         await asyncio.sleep(0.1) # slight delay to ensure client is ready for incoming messages
 
         await sio.emit('transcript', {'speaker': 'user', 'text': claim}, to=sid)
-        await gemini.session.send_client_content(
-            turns=[{"role": "user", "parts": [{"text": claim}]}],
-            turn_complete=True
-        )
+        await gemini.send_text(claim)
 
         
         await sio.emit('session_ready', {'sessionId': state.session_id}, to=sid)
@@ -381,6 +390,37 @@ async def audio_chunk(sid, data):
             await gemini.send_context(msg)
 
     await gemini.send_audio(audio_bytes)
+
+@sio.event
+async def text_turn(sid, data):
+    if sid not in sessions:
+        return
+
+    raw_text = data.get('text', '') if isinstance(data, dict) else ''
+    try:
+        text = sanitize_claim(raw_text)
+    except ValueError as e:
+        await sio.emit('error', {'message': str(e)}, to=sid)
+        return
+
+    session = sessions[sid]
+    if session.get('paused'):
+        await sio.emit('error', {'message': 'Session is paused. Resume before sending a turn.'}, to=sid)
+        return
+
+    if time.time() - session['started_at'] > MAX_SESSION_DURATION:
+        await sio.emit('error', {'message': 'Session time limit reached.'}, to=sid)
+        await end_session(sid)
+        return
+
+    await session['record_user_turn'](text)
+
+    recent = session['state'].get_recent_context(n=4)
+    rag_context = rag.retrieve(session['participant_id'], recent, n_results=8)
+    if rag_context:
+        await session['gemini'].send_context(build_rag_context(rag_context))
+
+    await session['gemini'].send_text(text)
 
 async def with_retry(coro_fn, max_retries=2):
     for attempt in range(max_retries + 1):
@@ -559,7 +599,7 @@ async def extract_claim(request: Request):
         response = await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: get_genai_client().models.generate_content(
-                model="gemini-3.1-flash-lite-preview",
+                model=GEMINI_TEXT_MODEL,
                 contents=prompt,
             )
         )
@@ -572,7 +612,11 @@ async def extract_claim(request: Request):
 
 @app.get("/health")
 async def health():
-    return {"ok": True}
+    return {
+        "ok": True,
+        "app_env": APP_ENV,
+        "mock_services": MOCK_SERVICES,
+    }
 
 @app.on_event("startup")
 async def startup():

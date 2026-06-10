@@ -11,19 +11,19 @@ describe('Idle state', () => {
     it('renders the textarea and start button after landing', () => {
         getPastLanding()
         expect(screen.getByRole('textbox')).toBeInTheDocument()
-        expect(screen.getByText(/start debate/i)).toBeInTheDocument()
+        expect(screen.getByText(/start (debate|demo)/i)).toBeInTheDocument()
     })
 
     it('does not allow starting with empty claim and no uploads', () => {
         const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => { })
         getPastLanding()
-        fireEvent.click(screen.getByText(/start debate/i))
-        expect(alertMock).toHaveBeenCalledWith(expect.stringMatching(/position|upload documents/i))
+        fireEvent.click(screen.getByText(/start (debate|demo)/i))
+        expect(alertMock).toHaveBeenCalledWith(expect.stringMatching(/position|upload documents|start the demo/i))
     })
 
-    it('shows guest label for anonymous user', () => {
+    it('shows the expected public-mode label', () => {
         getPastLanding()
-        expect(screen.getByText(/^Guest$/)).toBeInTheDocument()
+        expect(screen.getByText(/^(Guest|Demo mode)$/)).toBeInTheDocument()
     })
 })
 

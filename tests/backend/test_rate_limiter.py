@@ -45,16 +45,16 @@ class TestSessionStartLimit:
 
 class TestAudioChunkLimit:
     def test_allows_under_limit(self, limiter):
-        for _ in range(199):
+        for _ in range(499):
             assert limiter.check_audio_chunk("sid1") is True
 
     def test_blocks_at_limit(self, limiter):
-        for _ in range(200):
+        for _ in range(500):
             limiter.check_audio_chunk("sid1")
         assert limiter.check_audio_chunk("sid1") is False
 
     def test_clear_sid_resets_state(self, limiter):
-        for _ in range(200):
+        for _ in range(500):
             limiter.check_audio_chunk("sid1")
         limiter.clear_sid("sid1")
         assert limiter.check_audio_chunk("sid1") is True

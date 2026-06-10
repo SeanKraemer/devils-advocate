@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "sean-kraemer-portfolio"
+  },
+  "targets": {
+    "sean-kraemer-portfolio": {
+      "hosting": {
+        "devils": [
+          "devils-advocate"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

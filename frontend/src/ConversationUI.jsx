@@ -23,8 +23,9 @@ export function MicVisualizer({ volume, isPaused }) {
 }
 
 // ── 2. Turn Indicator + Interrupt hint ─────────────────────────
-export function TurnIndicator({ isAgentSpeaking, isPaused, agentHasSpoken }) {
+export function TurnIndicator({ isAgentSpeaking, isPaused, agentHasSpoken, inputMode = 'voice' }) {
     const waiting = !agentHasSpoken && !isAgentSpeaking
+    const turnText = inputMode === 'text' ? 'Your turn - type now' : 'Your turn - speak now'
 
     return (
         <div style={{
@@ -52,10 +53,10 @@ export function TurnIndicator({ isAgentSpeaking, isPaused, agentHasSpoken }) {
                     {isPaused ? 'Paused'
                         : waiting ? 'Waiting for agent...'
                             : isAgentSpeaking ? 'Agent is responding...'
-                                : 'Your turn — speak now'}
+                                : turnText}
                 </span>
             </div>
-            {isAgentSpeaking && (
+            {isAgentSpeaking && inputMode === 'voice' && (
                 <span style={{ fontSize: font.xs, color: colors.textFaint, fontStyle: 'italic' }}>
                     You can interrupt by speaking
                 </span>
@@ -84,7 +85,8 @@ export function MicStatusBar({ volume, isPaused }) {
 }
 
 // ── 4. First-time onboarding banner ────────────────────────────
-export function OnboardingBanner({ onDismiss }) {
+export function OnboardingBanner({ onDismiss, inputMode = 'voice' }) {
+    const isTextMode = inputMode === 'text'
     return (
         <div style={{
             padding: spacing.md,
@@ -95,14 +97,15 @@ export function OnboardingBanner({ onDismiss }) {
             justifyContent: 'space-between', gap: spacing.md,
         }}>
             <div style={{ display: 'flex', gap: spacing.md, alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 20 }}>🎤</span>
+                <span style={{ fontSize: 20 }}>{isTextMode ? '⌨' : '🎤'}</span>
                 <div>
                     <p style={{ margin: 0, fontSize: font.md, color: colors.textSecondary, fontWeight: 600 }}>
-                        This is a live voice conversation
+                        {isTextMode ? 'This is a public demo session' : 'This is a live voice conversation'}
                     </p>
                     <p style={{ margin: '4px 0 0', fontSize: font.sm, color: colors.textMuted, lineHeight: 1.5 }}>
-                        Speak naturally to respond. Your mic is always active — no buttons needed.
-                        You can interrupt the agent at any time by speaking over it.
+                        {isTextMode
+                            ? 'Type your responses below. The backend uses deterministic mock services, so no model keys or Firebase storage are required.'
+                            : 'Speak naturally to respond. Your mic is always active - no buttons needed. You can interrupt the agent at any time by speaking over it.'}
                     </p>
                 </div>
             </div>

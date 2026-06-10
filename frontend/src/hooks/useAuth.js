@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
+    DEMO_MODE,
     auth,
     googleProvider,
     githubProvider,
@@ -9,6 +10,13 @@ import {
     signOut,
 } from '../firebase'
 
+const DEMO_USER = {
+    uid: 'demo-user',
+    isAnonymous: true,
+    displayName: 'Demo user',
+    getIdToken: async () => 'demo-token',
+}
+
 /**
  * useAuth
  *
@@ -17,17 +25,20 @@ import {
  * - Exposes user, authReady, and sign-in/out actions
  *
  * Returns:
- *   user        — Firebase user object or null
- *   authReady   — true once the initial auth state has resolved
+ *   user        - Firebase user object or null
+ *   authReady   - true once the initial auth state has resolved
  *   signInWithGoogle
  *   signInWithGitHub
  *   handleSignOut
  */
 export function useAuth() {
-    const [user, setUser] = useState(null)
-    const [authReady, setAuthReady] = useState(false)
+    const [user, setUser] = useState(DEMO_MODE ? DEMO_USER : null)
+    const [authReady, setAuthReady] = useState(DEMO_MODE)
 
     useEffect(() => {
+        if (DEMO_MODE) {
+            return undefined
+        }
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
             if (firebaseUser) {
                 setUser(firebaseUser)
@@ -40,6 +51,7 @@ export function useAuth() {
     }, [])
 
     async function signInWithGoogle() {
+        if (DEMO_MODE) return
         try {
             await signInWithPopup(auth, googleProvider)
         } catch (err) {
@@ -48,6 +60,7 @@ export function useAuth() {
     }
 
     async function signInWithGitHub() {
+        if (DEMO_MODE) return
         try {
             await signInWithPopup(auth, githubProvider)
         } catch (err) {
@@ -56,8 +69,9 @@ export function useAuth() {
     }
 
     async function handleSignOut() {
+        if (DEMO_MODE) return
         await signOut(auth)
-        // onAuthStateChanged fires → triggers signInAnonymously again
+        // onAuthStateChanged fires and triggers signInAnonymously again.
     }
 
     return { user, authReady, signInWithGoogle, signInWithGitHub, handleSignOut }

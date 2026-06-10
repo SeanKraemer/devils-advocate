@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ref, uploadBytesResumable, deleteObject, listAll, getMetadata } from 'firebase/storage'
-import { storage } from './firebase'
+import { DEMO_MODE, storage } from './firebase'
 
 export function useDocumentUpload(user, isDebating) {
     const [uploadedFiles, setUploadedFiles] = useState([])
@@ -9,6 +9,7 @@ export function useDocumentUpload(user, isDebating) {
 
     // Load existing files whenever user changes
     useEffect(() => {
+        if (DEMO_MODE) return
         if (!user) return
         async function loadExistingFiles() {
             setLoadingFiles(true)
@@ -38,6 +39,7 @@ export function useDocumentUpload(user, isDebating) {
     }, [user])
 
     async function uploadFile(file) {
+        if (DEMO_MODE) return
         if (!user || isDebating) return
         if (!['application/pdf', 'text/plain'].includes(file.type)) {
             alert('Only PDF and .txt files are supported')
@@ -64,6 +66,7 @@ export function useDocumentUpload(user, isDebating) {
     }
 
     async function removeFile(filePath) {
+        if (DEMO_MODE) return
         if (isDebating) return
         try {
             await deleteObject(ref(storage, filePath))
@@ -74,6 +77,7 @@ export function useDocumentUpload(user, isDebating) {
     }
 
     async function clearAllFiles() {
+        if (DEMO_MODE) return
         if (!user || isDebating) return
         try {
             const folderRef = ref(storage, `users/${user.uid}/documents/`)
