@@ -10,6 +10,7 @@ vi.mock('socket.io-client', () => ({
 }))
 
 vi.mock('../firebase', () => ({
+    DEMO_MODE: false,
     auth: {},
     storage: {},
     googleProvider: {},

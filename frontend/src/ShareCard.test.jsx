@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildShareText } from './ShareCard'
 
 describe('buildShareText', () => {
-    it('uses the canonical public deployment URL', () => {
+    it('uses the configured public deployment URL fallback', () => {
         const text = buildShareText({
             claim: 'A startup idea',
             report: { overall_score: 7 },
@@ -19,6 +19,6 @@ describe('buildShareText', () => {
             },
         })
 
-        expect(text).toContain('https://devils-advocate-488918.web.app/')
+        expect(text).toContain(import.meta.env.VITE_PUBLIC_APP_URL || window.location.origin)
     })
 })

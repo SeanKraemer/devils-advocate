@@ -1,6 +1,6 @@
 # tests/backend/test_session_state.py
 import pytest
-from session_state import SessionState, Turn
+from session_state import SessionState
 
 @pytest.fixture
 def state():
@@ -38,15 +38,17 @@ class TestGetRecentContext:
         context = state.get_recent_context(n=6)
         assert "only turn" in context
 
-class TestAddClaimEvent:
-    def test_stores_claim_event(self, state):
-        state.add_claim_event("my argument", {
+class TestAddJudgeUpdate:
+    def test_stores_judge_update(self, state):
+        state.add_judge_update("my argument", {
             "classification": "DEFENDED",
             "summary": "good point",
-            "strength": 8
+            "strength": 8,
+            "suggested_argument": "cite pilot results",
         })
-        assert len(state.claim_events) == 1
-        assert state.claim_events[0].classification == "DEFENDED"
+        assert len(state.judge_updates) == 1
+        assert state.judge_updates[0].classification == "DEFENDED"
+        assert state.judge_updates[0].suggested_argument == "cite pilot results"
 
 class TestToDict:
     def test_serializes_correctly(self, state):

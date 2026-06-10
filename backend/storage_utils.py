@@ -5,12 +5,14 @@ from google.oauth2 import service_account
 from pypdf import PdfReader
 
 KEY_PATH = os.getenv("FIREBASE_KEY_PATH", "/secrets/firebase_key.json")
-BUCKET_NAME = os.getenv("FIREBASE_STORAGE_BUCKET", "devils-advocate-ec48b.firebasestorage.app")
+BUCKET_NAME = os.getenv("FIREBASE_STORAGE_BUCKET", "")
 MOCK_SERVICES = os.getenv("MOCK_SERVICES") == "1"
 
 def _get_client():
     if MOCK_SERVICES:
         raise RuntimeError("Firebase Storage is disabled in MOCK_SERVICES mode.")
+    if not BUCKET_NAME:
+        raise RuntimeError("FIREBASE_STORAGE_BUCKET is required for Firebase Storage.")
     creds = service_account.Credentials.from_service_account_file(KEY_PATH)
     return storage.Client(credentials=creds, project=creds.project_id)
 

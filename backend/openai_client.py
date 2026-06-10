@@ -15,9 +15,9 @@ class OpenAIClient:
     response model to get validated structured output back.
     """
 
-    def __init__(self, system_prompt: str, model: str = "gpt-5.4-mini-2026-03-17"):
+    def __init__(self, system_prompt: str, model: str | None = None):
         self.system_prompt = system_prompt
-        self.model = model
+        self.model = model or os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
         self._client = None if MOCK_SERVICES else AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def _mock_response(self, response_model):
@@ -47,11 +47,14 @@ class OpenAIClient:
             )
         if "overall_score" in fields:
             return response_model(
+                idea_summary="A founder is testing whether a startup idea has a clear buyer, urgent problem, and defensible path to market.",
                 overall_score=5,
-                verdict="Mock mode generated a placeholder report.",
-                strengths=["Local demo completed without live OpenAI calls."],
-                weaknesses=["Configure service credentials for real analysis."],
-                recommendation="Add credentials and rerun the debate for production results.",
+                verdict="Demo mode generated a neutral report from deterministic local responses.",
+                strengths=["The pitch identified a target problem and invited direct pushback."],
+                weaknesses=["The demo transcript uses canned challenges, so evidence quality is not fully evaluated."],
+                sharpest_moment="The strongest moment was engaging the core buying-problem challenge instead of only describing product features.",
+                biggest_gap="The biggest unresolved gap is repeatable distribution and proof that customers will pay.",
+                recommendation="Use the live credentialed mode for a real evaluation, then compare the report against customer evidence and sales data.",
             )
         if "summary" in fields:
             return response_model(summary="Mock mode is enabled; live synthesis was skipped.")

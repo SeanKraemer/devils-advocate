@@ -2,14 +2,15 @@ import { initializeApp } from 'firebase/app'
 import { getAuth, signInAnonymously, signInWithPopup, GoogleAuthProvider, GithubAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth'
 import { getStorage, ref, uploadBytesResumable, deleteObject, listAll, getMetadata, getDownloadURL } from 'firebase/storage'
 
+export const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === '1'
 
 const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || (DEMO_MODE ? 'demo-api-key' : undefined),
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || (DEMO_MODE ? 'demo.firebaseapp.com' : undefined),
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || (DEMO_MODE ? 'demo-devils-advocate' : undefined),
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || (DEMO_MODE ? 'demo-devils-advocate.firebasestorage.app' : undefined),
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || (DEMO_MODE ? '000000000000' : undefined),
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || (DEMO_MODE ? 'demo-app-id' : undefined),
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 }
 

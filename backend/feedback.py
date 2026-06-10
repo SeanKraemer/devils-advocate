@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, model_validator
 
 
-FEEDBACK_VERSION = "research_feedback_v1"
+FEEDBACK_VERSION = "portfolio_feedback_v1"
 
 ScaleResponse = Annotated[int, Field(ge=1, le=5)]
 
@@ -47,7 +47,7 @@ MostValuablePart = Literal[
     "weaknesses_exposed",
     "judge_scorecard",
     "written_report_next_steps",
-    "transcript_claim_tracker",
+    "transcript_judge_timeline",
     "other",
 ]
 
@@ -154,7 +154,7 @@ class ClientContext(BaseModel):
     report_available: bool
 
 
-class StudyFeedback(BaseModel):
+class ProductFeedback(BaseModel):
     idea_impact: IdeaImpactFeedback
     voice_experience: VoiceExperienceFeedback
     report_utility: ReportUtilityFeedback | None = None
@@ -175,10 +175,10 @@ class StudyFeedback(BaseModel):
 class FeedbackSubmissionRequest(BaseModel):
     idToken: str = Field(min_length=1)
     sessionId: str = Field(min_length=1)
-    feedback: StudyFeedback
+    feedback: ProductFeedback
 
 
-def build_feedback_record(feedback: StudyFeedback) -> dict:
+def build_feedback_record(feedback: ProductFeedback) -> dict:
     summary_scores = {
         "idea_impact_index": _average(
             feedback.idea_impact.refined_idea,

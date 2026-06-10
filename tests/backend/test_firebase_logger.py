@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 def logger(mock_firebase):
     fake_db, store = mock_firebase
     import firebase_logger
-    firebase_logger.db = fake_db  # ← this line is critical
+    firebase_logger.db = fake_db
     from firebase_logger import SessionLogger
     return SessionLogger("test_session_001", "my startup idea", uid="user123"), store
 
@@ -24,24 +24,23 @@ class TestLogTurn:
         turns = store["test_session_001"]["turns"]
         assert any(t["speaker"] == "user" for t in turns)
 
-class TestLogClaimEvent:
+class TestLogJudgeUpdate:
     def test_running_avg_no_read(self, logger):
         instance, store = logger
-        instance.log_claim_event({"classification": "DEFENDED", "summary": "good", "strength": 8})
-        instance.log_claim_event({"classification": "CONCEDED", "summary": "fair", "strength": 4})
+        instance.log_judge_update({"classification": "DEFENDED", "summary": "good", "strength": 8})
+        instance.log_judge_update({"classification": "CONCEDED", "summary": "fair", "strength": 4})
         assert instance._strength_count == 2
         assert instance._strength_sum == 12
 
     def test_correct_metric_key_defended(self, logger):
         instance, store = logger
-        instance.log_claim_event({"classification": "DEFENDED", "summary": "x", "strength": 5})
-        metrics = store["test_session_001"].get("metrics", {})
+        instance.log_judge_update({"classification": "DEFENDED", "summary": "x", "strength": 5})
         assert "defended_count" in str(store)  # updated via dot notation
 
     def test_correct_metric_key_new_claim(self, logger):
         instance, store = logger
         # Should not raise — new_claim maps correctly
-        instance.log_claim_event({"classification": "NEW_CLAIM", "summary": "x", "strength": 5})
+        instance.log_judge_update({"classification": "NEW_CLAIM", "summary": "x", "strength": 5})
 
 class TestFinalize:
     def test_deletes_doc_if_no_consent(self, logger):
@@ -53,3 +52,11 @@ class TestFinalize:
         instance, store = logger
         instance.finalize(consent_given=True)
         assert "test_session_001" in store
+
+
+class TestFeedbackStorage:
+    def test_save_feedback_noops_when_storage_disabled(self, monkeypatch):
+        import firebase_logger
+
+        monkeypatch.setattr(firebase_logger, "db", None)
+        firebase_logger.save_post_debate_feedback("session_001", "user123", {"rating": 5})

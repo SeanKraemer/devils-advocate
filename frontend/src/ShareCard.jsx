@@ -19,7 +19,7 @@
 //   "The founder cited real data but never closed
 //    the distribution gap."
 //
-//   Stress-test your idea → devils-advocate-488918.web.app
+//   Stress-test your idea -> https://your-portfolio-domain.example
 
 export function buildShareText({ claim, judgeResult }) {
     const lines = []
@@ -92,7 +92,7 @@ export function buildShareText({ claim, judgeResult }) {
 
     // ── CTA ──
     lines.push(`Stress-test your idea →`)
-    lines.push(`https://devils-advocate-488918.web.app/`)
+    lines.push(import.meta.env.VITE_PUBLIC_APP_URL || window.location.origin)
 
     return lines.join('\n')
 }

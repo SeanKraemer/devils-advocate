@@ -16,6 +16,7 @@ def patched_server():
     mock_gemini.connect = AsyncMock()
     mock_gemini.send_audio = AsyncMock()
     mock_gemini.send_context = AsyncMock()
+    mock_gemini.send_text = AsyncMock()
     mock_gemini.close = AsyncMock()
     mock_gemini.running = True
     mock_gemini.session = MagicMock()
@@ -82,6 +83,7 @@ class TestSessionLifecycle:
                 break
 
         assert session_ready, "Never received session_ready event"
+        mock_gemini.send_text.assert_called()
 
         await client.emit("audio_chunk", bytes(1024))
         await asyncio.sleep(0.1)
@@ -90,6 +92,45 @@ class TestSessionLifecycle:
         await asyncio.sleep(0.3)
 
         mock_gemini.close.assert_called_once()
+        await client.disconnect()
+
+    async def test_text_turn_records_and_reaches_debate_client(self, patched_server):
+        mock_gemini = patched_server
+        mock_gemini.send_text.reset_mock()
+        client = socketio.AsyncSimpleClient()
+
+        await client.connect(f"http://127.0.0.1:{SERVER_PORT}")
+        await client.emit("start_session", {
+            "claim": "I want to build an AI HR tool",
+            "idToken": "fake_token",
+            "isAnonymous": True,
+            "documentPaths": [],
+            "stage": "early",
+        })
+
+        session_ready = False
+        for _ in range(10):
+            event = await client.receive(timeout=3)
+            if event[0] == "session_ready":
+                session_ready = True
+                break
+        assert session_ready
+
+        await client.emit("text_turn", {"text": "Our pilot users already pay for this."})
+
+        saw_user_turn = False
+        for _ in range(10):
+            event = await client.receive(timeout=3)
+            if (
+                event[0] == "transcript"
+                and event[1]["speaker"] == "user"
+                and event[1]["text"] == "Our pilot users already pay for this."
+            ):
+                saw_user_turn = True
+                break
+
+        assert saw_user_turn
+        mock_gemini.send_text.assert_any_await("Our pilot users already pay for this.")
         await client.disconnect()
 
     async def test_rejects_empty_claim(self, patched_server):

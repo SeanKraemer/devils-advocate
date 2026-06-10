@@ -18,7 +18,7 @@ function openWidget(props = {}) {
         />
     )
 
-    fireEvent.click(screen.getByText(/study feedback/i))
+    fireEvent.click(screen.getByText(/product feedback/i))
     return { user }
 }
 
@@ -84,7 +84,7 @@ describe('FeedbackWidget', () => {
             />
         )
 
-        expect(screen.getByText(/research feedback unavailable/i)).toBeInTheDocument()
+        expect(screen.getByText(/feedback unavailable/i)).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: /submit feedback/i })).not.toBeInTheDocument()
     })
 
@@ -136,6 +136,6 @@ describe('FeedbackWidget', () => {
         expect(body.feedback.client_context.report_available).toBe(true)
         expect(body.feedback.voice_experience.next_time_preference).toBe('voice')
         expect(body.feedback.voice_experience.hurdles).toEqual(['turn_taking'])
-        expect(screen.getByText(/research feedback recorded/i)).toBeInTheDocument()
+        expect(screen.getByText(/feedback recorded/i)).toBeInTheDocument()
     })
 })

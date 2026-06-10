@@ -3,9 +3,11 @@ import { io } from 'socket.io-client'
 import { colors } from '../theme'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === '1'
+const PUBLIC_APP_URL = import.meta.env.VITE_PUBLIC_APP_URL || window.location.origin
 
 const LETTER_PX = { w: 612, h: 792 }
-const PDF_TITLE_PAGE_LINK = 'https://devils-advocate-488918.web.app/'
+const PDF_TITLE_PAGE_LINK = PUBLIC_APP_URL
 
 /**
  * useDebateSession
@@ -48,6 +50,7 @@ export function useDebateSession() {
     const [micVolume, setMicVolume] = useState(0)  // 0-1 float
     const [reportReady, setReportReady] = useState(false)
     const [sessionId, setSessionId] = useState(null)
+    const [textTurnPending, setTextTurnPending] = useState(false)
 
     // ── Refs ───────────────────────────────────────────────────────
     const socketRef = useRef(null)
@@ -133,7 +136,7 @@ export function useDebateSession() {
         socketRef.current.on('session_ready', (data) => {
             setSessionId(data?.sessionId || null)
             setStatus('debating')
-            if (!micStartedRef.current) {
+            if (!DEMO_MODE && !micStartedRef.current) {
                 micStartedRef.current = true
                 startMicCapture()
             }
@@ -172,10 +175,12 @@ export function useDebateSession() {
 
     // ── Start / End ────────────────────────────────────────────────
     async function startDebate(claim, user, uploadedFiles, stage = 'late') {
-        if (!audioContextRef.current) {
+        if (!DEMO_MODE && !audioContextRef.current) {
             audioContextRef.current = new AudioContext({ sampleRate: 24000 })
         }
-        await audioContextRef.current.resume()
+        if (!DEMO_MODE) {
+            await audioContextRef.current.resume()
+        }
 
         setStatus('connecting')
         setReport(null)
@@ -201,6 +206,14 @@ export function useDebateSession() {
         })
     }
 
+    async function sendTextTurn(text) {
+        const clean = text.trim()
+        if (!clean || status !== 'debating') return
+        setTextTurnPending(true)
+        socketRef.current?.emit('text_turn', { text: clean })
+        window.setTimeout(() => setTextTurnPending(false), 500)
+    }
+
     function endDebate() {
         setStatus('ended')
         resetLiveState()
@@ -220,6 +233,7 @@ export function useDebateSession() {
         setSessionStatus('')
         setConsentGiven(true)
         setSessionId(null)
+        setTextTurnPending(false)
     }
 
     // ── Pause / Consent ────────────────────────────────────────────
@@ -548,8 +562,10 @@ export function useDebateSession() {
         micVolume,
         reportReady,
         sessionId,
+        textTurnPending,
         // actions
         startDebate,
+        sendTextTurn,
         endDebate,
         resetSession,
         togglePause,
