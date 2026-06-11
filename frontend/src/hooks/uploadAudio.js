@@ -48,14 +48,11 @@ export async function uploadAudioToStorage(sessionId, blob, { onProgress } = {})
     const storagePath = `sessions/${sessionId}/audio.${ext}`
     const storageRef = ref(storage, storagePath)
 
-    console.log(`[uploadAudio] Starting upload → ${storagePath} (${(blob.size / 1024).toFixed(1)} KB)`)
-
     let lastError
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
             const downloadURL = await attemptUpload(storageRef, blob, onProgress)
-            console.log(`[uploadAudio] Upload complete on attempt ${attempt}. URL: ${downloadURL}`)
             return downloadURL
         } catch (err) {
             lastError = err
@@ -81,7 +78,6 @@ export async function uploadAudioToStorage(sessionId, blob, { onProgress } = {})
  * Single upload attempt. Returns download URL on success, throws on failure.
  */
 function attemptUpload(storageRef, blob, onProgress) {
-    console.log('[uploadAudio] Uploading to Firebase Storage...')
     return new Promise((resolve, reject) => {
         const uploadTask = uploadBytesResumable(storageRef, blob, {
             contentType: blob.type || 'audio/webm',

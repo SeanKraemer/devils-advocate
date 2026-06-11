@@ -107,7 +107,6 @@ export function useAudioRecorder() {
             }
 
             mediaRecorderRef.current = mr
-            console.log('[AudioRecorder] Initialised. MIME:', mimeType || '(browser default)')
 
         } catch (err) {
             console.error('[AudioRecorder] initRecorder failed — recording disabled for this session:', err)
@@ -150,7 +149,6 @@ export function useAudioRecorder() {
         }
         try {
             mr.start(1_000) // timeslice = 1s
-            console.log('[AudioRecorder] Recording started')
         } catch (err) {
             console.error('[AudioRecorder] startRecording failed:', err)
         }
@@ -195,7 +193,6 @@ export function useAudioRecorder() {
                     return
                 }
                 const blob = new Blob(chunks, { type: mimeTypeRef.current || 'audio/webm' })
-                console.log(`[AudioRecorder] Stopped. Blob size: ${(blob.size / 1024).toFixed(1)} KB`)
                 resolve(blob.size > 0 ? blob : null)
             }
 
