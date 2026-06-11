@@ -3,3 +3,4 @@ pytest-mock==3.14.0
 httpx==0.28.1          # already in requirements.txt, needed for ASGI test client
 python-socketio[asyncio_client]==5.16.1  # for integration tests
 twisted==25.5.0          # satisfies pytest-twisted when backend requirements are installed
+ruff==0.15.17

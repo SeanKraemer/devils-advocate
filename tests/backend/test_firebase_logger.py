@@ -1,6 +1,5 @@
 # tests/backend/test_firebase_logger.py
 import pytest
-from unittest.mock import patch, MagicMock
 
 @pytest.fixture
 def logger(mock_firebase):

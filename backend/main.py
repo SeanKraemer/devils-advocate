@@ -176,7 +176,7 @@ async def start_session(sid, data):
 
     try:
         participant_id = validate_participant_id(uid)
-    except ValueError as e:
+    except ValueError:
         await sio.emit('error', {'message': 'Invalid session identity.'}, to=sid)
         return
 

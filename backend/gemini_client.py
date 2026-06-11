@@ -152,7 +152,7 @@ class GeminiLiveClient:
                             await self.on_text(self._agent_transcript_buffer.strip(), partial=False)
                             self._agent_transcript_buffer = ""
                         else: 
-                            logger.info(f"turn_complete with empty transcript buffer — audio-only turn")
+                            logger.info("turn_complete with empty transcript buffer — audio-only turn")
                         if self._user_transcript_buffer.strip() and self.on_user_text:
                             await self.on_user_text(self._user_transcript_buffer.strip(), partial=False)
                             self._user_transcript_buffer = ""

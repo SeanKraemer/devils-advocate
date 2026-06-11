@@ -91,7 +91,7 @@ class SessionLogger:
                 "timestamp": _now(),
                 "turn_index": turn_index,
             }]),
-            f"metrics.total_turns": firestore.Increment(1),
+            "metrics.total_turns": firestore.Increment(1),
             f"metrics.{'user' if speaker == 'user' else 'agent'}_turns": firestore.Increment(1),
         })
 

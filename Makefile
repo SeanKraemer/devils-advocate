@@ -7,6 +7,9 @@ test-frontend:
 lint-frontend:
 	cd frontend && npm run lint
 
+lint-backend:
+	ruff check backend/ tests/
+
 build-frontend:
 	cd frontend && npm run build
 
