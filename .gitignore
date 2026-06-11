@@ -14,4 +14,3 @@ firebase_info*.json
 .firebase/
 dist/
 frontend/dist/
-AGENTS.md
