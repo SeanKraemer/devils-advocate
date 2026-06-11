@@ -1,5 +1,7 @@
 # Devil's Advocate
 
+[![CI](https://github.com/SeanKraemer/devils-advocate/actions/workflows/ci.yml/badge.svg)](https://github.com/SeanKraemer/devils-advocate/actions/workflows/ci.yml)
+
 Devil's Advocate is a real-time AI debate app for stress-testing startup ideas. A founder states a pitch, the agent attacks weak assumptions, and the app produces a transcript, live judge updates, and a structured post-debate report.
 
 This public portfolio version is adapted from a Spring 2026 UIUC MCS CS 568 group prototype. It keeps the product and engineering work visible while removing private course materials, teammate identifiers, participant data, old deployment IDs, and credential-dependent demo paths.
@@ -7,6 +9,12 @@ This public portfolio version is adapted from a Spring 2026 UIUC MCS CS 568 grou
 ## Live Demo
 
 Try the public mock demo: https://devils-advocate.web.app
+
+![Demo: a founder pitches an IoT smart pill bottle, the AI opponent attacks the weakest assumptions over typed turns, the judge panel scores the exchange live, and the session ends with a structured verdict report](docs/demo.gif)
+
+*A full session against the hosted mock demo: pitch an idea, defend it across typed turns while the AI opponent presses on intent-vs-behavior and distribution risk, watch the judge panel update live, then hold to end and get the structured post-debate report.*
+
+<!-- VOICE-DEMO-PLACEHOLDER: after recording the spoken debate (see docs/DEMO_RECORDING_GUIDE.md), replace this comment with the GitHub user-attachment mp4 link so the video plays inline. -->
 
 The hosted demo runs in deterministic mock mode. It is safe to leave online because it does not call live Gemini/OpenAI services or write Firebase user data.
 
@@ -32,17 +40,22 @@ Public demo behavior:
 
 ## Architecture
 
-```text
-React/Vite frontend
-  |  Socket.IO events: start_session, text_turn, audio_chunk, end_session
-  v
-FastAPI + Socket.IO backend
-  |  session lifecycle, validation, rate limiting, transcript state
-  |  optional RAG over uploaded docs + bundled knowledge base
-  |  Gemini Live/text debate client
-  |  OpenAI structured judge/report clients
-  v
-Firebase Auth/Firestore/Storage in live mode
+```mermaid
+flowchart TD
+    FE["React/Vite frontend<br/>pitch flow · transcript · judge timeline · report · PDF export"]
+    BE["FastAPI + Socket.IO backend<br/>session lifecycle · validation · rate limiting · transcript state"]
+    RAG["RAG retrieval<br/>Chroma over bundled knowledge base + uploaded docs"]
+    GEM["Gemini Live/text<br/>debate opponent"]
+    OAI["OpenAI structured outputs<br/>judge panel + report"]
+    FB["Firebase Auth / Firestore / Storage<br/>(live mode only)"]
+    MOCK["Deterministic mock services<br/>(MOCK_SERVICES=1, public demo)"]
+
+    FE -- "Socket.IO: start_session · text_turn · audio_chunk · end_session" --> BE
+    BE --> RAG
+    BE --> GEM
+    BE --> OAI
+    BE --> FB
+    BE -. "public demo path" .-> MOCK
 ```
 
 Repository layout:
@@ -256,6 +269,24 @@ Before treating the project as portfolio-ready, manually verify:
 - Mobile viewport remains usable for the pitch input, transcript, typed turn composer, and report.
 - README, env examples, and source scans contain no teammate names, private course materials, participant data, secrets, or old deployment IDs.
 
+## Design Notes & Limitations
+
+- The public demo is intentionally deterministic. `MOCK_SERVICES=1` swaps the Gemini, OpenAI, and Firebase clients for local mocks at the integration boundary, so the hosted app can never spend API quota or write user data — but it also means the public demo shows interaction design, not live model quality.
+- Session state lives in process memory keyed by Socket.IO sid. A Cloud Run instance restart drops active sessions; there is no session resume. Acceptable for a demo, not for production.
+- The judge panel and report rely on structured outputs from a single model call each. There is no retry/ensemble logic, so a malformed model response in live mode degrades to an error path rather than a recovered result.
+- Voice debate uses Gemini Live over WebSocket relayed through the backend. Latency is noticeable on cold Cloud Run starts, and there is no echo cancellation beyond what the browser provides.
+- Rate limiting is per-IP and in-memory (connections and session starts). It protects the demo from casual abuse, not from a distributed flood.
+- RAG retrieval quality depends on a small bundled startup/VC knowledge base; uploaded-document retrieval is best-effort chunking without reranking.
+- Frontend test coverage is intentionally thin (smoke-level component tests); the deterministic backend core carries the test weight.
+
+## What I Learned
+
+- Mock the integration boundary, not the business logic. Putting `MOCK_SERVICES` checks exactly where external clients are constructed made the same codebase safely demoable in public and fully live in private, without forking behavior.
+- Real-time UX is mostly state discipline. Transcripts, partial transcripts, interruptions, judge updates, and report generation all race over one socket; modeling the session as explicit server-side state made the UI predictable.
+- Structured outputs turn LLM calls into APIs. Forcing judge/report responses into schemas is what made the UI layout, PDF export, and tests stable.
+- A demo that can't cost you money is a demo you can actually leave online. Designing the public path to be credential-free was the difference between a screenshot and a clickable link.
+- Deploy identity beats deploy secrets. Workload Identity Federation removed the last long-lived credential from CI.
+
 ## Portfolio Framing
 
 This project is strongest as a playable public mock demo plus a clear code walkthrough. The public demo shows the interaction design and architecture without live model cost or privacy risk. Live voice mode is still valuable for controlled demos, but it should stay behind explicit credentials, monitoring, and quota controls.
@@ -267,3 +298,7 @@ Good interview discussion topics:
 - How structured-output model clients make report and judge data predictable for the UI.
 - How env-driven URLs, CORS, and GitHub Actions make the project portable across deployments.
 - What tradeoffs remain before a production launch: persistence model, abuse controls, observability, model latency, and stronger end-to-end browser coverage.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
