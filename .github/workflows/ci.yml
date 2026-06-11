@@ -17,8 +17,8 @@ jobs:
       FIREBASE_KEY_PATH: /tmp/fake_firebase_key.json
       FIREBASE_STORAGE_BUCKET: test-bucket.firebasestorage.app
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -42,8 +42,8 @@ jobs:
       VITE_BACKEND_URL: http://localhost:8000
       VITE_PUBLIC_APP_URL: http://localhost:5173
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
