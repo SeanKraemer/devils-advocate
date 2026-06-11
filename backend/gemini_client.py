@@ -1,9 +1,12 @@
 import asyncio
 import base64
+import logging
 import os
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 MOCK_SERVICES = os.getenv("MOCK_SERVICES") == "1"
@@ -83,7 +86,7 @@ class GeminiLiveClient:
                 audio=types.Blob(data=audio_bytes, mime_type="audio/pcm;rate=16000")
             )
         except Exception as e:
-            print(f"Audio send error: {e}")
+            logger.error(f"Audio send error: {e}")
             self.running = False
             if self.on_error:
                 await self.on_error("Connection to debate engine lost. Please end and start a new session.")
@@ -97,7 +100,7 @@ class GeminiLiveClient:
                 turn_complete=True,
             )
         except Exception as e:
-            print(f"Text send error: {e}")
+            logger.error(f"Text send error: {e}")
             self.running = False
             if self.on_error:
                 await self.on_error("Connection to debate engine lost. Please end and start a new session.")
@@ -149,7 +152,7 @@ class GeminiLiveClient:
                             await self.on_text(self._agent_transcript_buffer.strip(), partial=False)
                             self._agent_transcript_buffer = ""
                         else: 
-                            print(f"turn_complete with empty transcript buffer — audio-only turn")
+                            logger.info(f"turn_complete with empty transcript buffer — audio-only turn")
                         if self._user_transcript_buffer.strip() and self.on_user_text:
                             await self.on_user_text(self._user_transcript_buffer.strip(), partial=False)
                             self._user_transcript_buffer = ""
@@ -164,7 +167,7 @@ class GeminiLiveClient:
                             await self.on_interrupted()
 
         except Exception as e:
-            print(f"Listen error: {e}")
+            logger.error(f"Listen error: {e}")
             self.running = False
 
     async def send_context(self, context_text: str):
@@ -176,7 +179,7 @@ class GeminiLiveClient:
                 turn_complete=False
             )
         except Exception as e:
-            print(f"Context injection error: {e}")
+            logger.error(f"Context injection error: {e}")
 
     async def close(self):
         self.running = False

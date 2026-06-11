@@ -1,8 +1,11 @@
 import os
 import io
+import logging
 from google.cloud import storage
 from google.oauth2 import service_account
 from pypdf import PdfReader
+
+logger = logging.getLogger(__name__)
 
 KEY_PATH = os.getenv("FIREBASE_KEY_PATH", "/secrets/firebase_key.json")
 BUCKET_NAME = os.getenv("FIREBASE_STORAGE_BUCKET", "")
@@ -25,7 +28,7 @@ def _extract_text(blob_bytes: bytes, filename: str) -> str:
             pages = [page.extract_text() or "" for page in reader.pages]
             return "\n".join(pages).strip()
         except Exception as e:
-            print(f"PDF extraction error for {filename}: {e}")
+            logger.error(f"PDF extraction error for {filename}: {e}")
             return ""
     else:
         # Plain text
@@ -42,7 +45,7 @@ def download_and_extract(document_paths: list[str]) -> tuple[list[str], list[dic
     if not document_paths:
         return [], []
     if MOCK_SERVICES:
-        print("[Storage] MOCK_SERVICES=1; skipping Firebase document download.")
+        logger.info("[Storage] MOCK_SERVICES=1; skipping Firebase document download.")
         return [], []
 
     client = _get_client()
@@ -62,7 +65,7 @@ def download_and_extract(document_paths: list[str]) -> tuple[list[str], list[dic
 
             text = _extract_text(blob_bytes, filename)
             if not text:
-                print(f"[Storage] No text extracted from {filename}, skipping")
+                logger.warning(f"[Storage] No text extracted from {filename}, skipping")
                 continue
 
             # Chunk into ~300 word segments same as base knowledge
@@ -76,13 +79,13 @@ def download_and_extract(document_paths: list[str]) -> tuple[list[str], list[dic
                         "type": "user_upload"
                     })
 
-            print(f"[Storage] Extracted {len(chunks)} chunks from {display_name}")
+            logger.info(f"[Storage] Extracted {len(chunks)} chunks from {display_name}")
 
         except Exception as e:
-            print(f"[Storage] Failed to process {path}: {e}")
+            logger.error(f"[Storage] Failed to process {path}: {e}")
             continue
 
-    print(f"[Storage DEBUG] returning {len(texts)} texts, types: {list(set(type(t).__name__ for t in texts))}")
+    logger.info(f"[Storage DEBUG] returning {len(texts)} texts, types: {list(set(type(t).__name__ for t in texts))}")
     return texts, metadatas
 
 
@@ -99,6 +102,6 @@ def delete_user_files(uid: str) -> None:
             return
         for blob in blobs:
             blob.delete()
-        print(f"[Storage] Deleted {len(blobs)} files for uid {uid}")
+        logger.info(f"[Storage] Deleted {len(blobs)} files for uid {uid}")
     except Exception as e:
-        print(f"[Storage] Deletion error for uid {uid}: {e}")
+        logger.error(f"[Storage] Deletion error for uid {uid}: {e}")

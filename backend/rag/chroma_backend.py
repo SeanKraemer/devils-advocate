@@ -1,8 +1,11 @@
 import os
 import glob
+import logging
 import chromadb
 from chromadb.utils import embedding_functions
 from .base import RAGBackend
+
+logger = logging.getLogger(__name__)
 
 KNOWLEDGE_DIR = os.path.join(os.path.dirname(__file__), "..", "knowledge_base")
 
@@ -21,9 +24,9 @@ def _warm_up_embeddings():
         tmp = _client.get_or_create_collection("warmup-init", embedding_function=embedding_fn)
         tmp.upsert(documents=["warmup"], ids=["warmup0"])
         _client.delete_collection("warmup-init")
-        print("[RAG] Embedding model warmed up")
+        logger.info("[RAG] Embedding model warmed up")
     except Exception as e:
-        print(f"[RAG] Warmup failed (non-fatal): {e}")
+        logger.warning(f"[RAG] Warmup failed (non-fatal): {e}")
 
 def _load_base_knowledge():
     global _BASE_CHUNKS, _BASE_METAS
@@ -37,7 +40,7 @@ def _load_base_knowledge():
             if clean:
                 _BASE_CHUNKS.append(clean)
                 _BASE_METAS.append({"source": os.path.basename(filepath), "type": "base"})
-    print(f"[RAG] Loaded {len(_BASE_CHUNKS)} base knowledge chunks")
+    logger.info(f"[RAG] Loaded {len(_BASE_CHUNKS)} base knowledge chunks")
 
 _load_base_knowledge()  # runs once on import
 _warm_up_embeddings()  # runs once on import
@@ -74,14 +77,14 @@ class ChromaBackend(RAGBackend):
                     clean_metas.append(m)
                     clean_ids.append(i)
             except Exception as e:
-                print(f"[Chroma] Skipping bad doc id={i}: {e}")
+                logger.warning(f"[Chroma] Skipping bad doc id={i}: {e}")
                 continue
 
         if not clean:
-            print("[Chroma] No valid documents after cleaning — skipping upsert")
+            logger.warning("[Chroma] No valid documents after cleaning — skipping upsert")
             return
 
-        print(f"[Chroma] Upserting {len(clean)} docs")
+        logger.info(f"[Chroma] Upserting {len(clean)} docs")
         collection.upsert(
             documents=clean,
             ids=clean_ids,
@@ -98,11 +101,11 @@ class ChromaBackend(RAGBackend):
         try:
             _client.delete_collection(f"participant_{participant_id}")
         except Exception as e:
-            print(f"RAG delete_participant error: {e}")
+            logger.error(f"RAG delete_participant error: {e}")
             # Force-create a fresh empty collection to prevent stale data leaking
             try:
                 _client.get_or_create_collection(f"participant_{participant_id}")
                 _client.delete_collection(f"participant_{participant_id}")
             except Exception as e2:
-                print(f"RAG delete_participant error (fallback): {e2}")
+                logger.error(f"RAG delete_participant error (fallback): {e2}")
                 pass 

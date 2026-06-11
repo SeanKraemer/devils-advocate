@@ -1,6 +1,9 @@
+import logging
 import os
 from google import genai
 from google.genai import types
+
+logger = logging.getLogger(__name__)
 
 MOCK_SERVICES = os.getenv("MOCK_SERVICES") == "1"
 client = None if MOCK_SERVICES else genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -48,5 +51,5 @@ DOCUMENT TEXT:
             raise ValueError("Summary was empty")
         return summary
     except Exception as e:
-        print(f"[Summary] Error: {e}")
+        logger.error(f"[Summary] Error: {e}")
         raise

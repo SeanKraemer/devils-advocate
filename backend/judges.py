@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from collections import Counter
 from typing import Literal
 
@@ -6,6 +7,8 @@ from pydantic import BaseModel, Field
 
 from openai_client import OpenAIClient
 from prompts import JUDGE_PROMPTS, JUDGE_SYNTHESIS_LABELS, VERDICT_PANEL_SYNTHESIS_PROMPT
+
+logger = logging.getLogger(__name__)
 
 
 # ── Per-turn model (replaces ClaimClassificationResult) ──────────────
@@ -166,11 +169,11 @@ async def run_live_judge_update(
             if isinstance(score, JudgeTurnScore):
                 valid.append((name, score))
         if not valid:
-            print("Judge live update: all judges failed")
+            logger.error("Judge live update: all judges failed")
             return None
         return _merge_turn_scores(valid)
     except Exception as e:
-        print(f"Judge live update error: {e}")
+        logger.error(f"Judge live update error: {e}")
         return None
 
 
@@ -222,7 +225,7 @@ async def run_judge_panel(
     )
     valid = [r for r in results if isinstance(r, dict)]
     if not valid:
-        print("Judge panel: all judges failed")
+        logger.error("Judge panel: all judges failed")
     return valid
 
 
@@ -311,7 +314,7 @@ async def merge_verdicts(verdicts: list[dict]) -> dict:
         if synthesized:
             consensus_summary = synthesized
     except Exception as e:
-        print(f"Verdict panel synthesis failed: {e}")
+        logger.error(f"Verdict panel synthesis failed: {e}")
     if not consensus_summary:
         consensus_summary = _fallback_panel_summary(verdicts, consensus_overall)
 

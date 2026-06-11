@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import time
 import re
@@ -33,6 +34,9 @@ from storage_utils import download_and_extract, delete_user_files
 from summary import summarize_documents
 from firebase_admin import auth as fb_auth
 from voice_selector import assign_voice
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 MAX_SESSION_DURATION = 20 * 60  # 20 minutes
 MIN_TURNS_FOR_REPORT = 2  # require at least 2 user and 2 agent turns to generate report
@@ -92,13 +96,13 @@ def verify_id_token(id_token: str):
 async def connect(sid, environ):
     ip = environ.get('HTTP_X_FORWARDED_FOR', environ.get('REMOTE_ADDR', 'unknown'))
     if not limiter.check_connection(ip):
-        print(f"Rate limit: too many connections from {ip}")
+        logger.warning(f"Rate limit: too many connections from {ip}")
         return False  # returning False rejects the connection
-    print(f"Client connected: {sid}")
+    logger.info(f"Client connected: {sid}")
 
 @sio.event
 async def disconnect(sid, reason=None):
-    print(f"Client disconnected: {sid}, reason: {reason}")
+    logger.info(f"Client disconnected: {sid}, reason: {reason}")
     limiter.clear_sid(sid)
     last_retrieval.pop(sid, None)
     session = sessions.pop(sid, None)
@@ -106,7 +110,7 @@ async def disconnect(sid, reason=None):
         try:
             rag.delete_participant(session['participant_id'])
         except Exception as e:
-            print(f"RAG cleanup error on disconnect: {e}")
+            logger.error(f"RAG cleanup error on disconnect: {e}")
         if session.get('is_anonymous'):
             await asyncio.get_event_loop().run_in_executor(
                 None, delete_user_files, session['participant_id']
@@ -114,7 +118,7 @@ async def disconnect(sid, reason=None):
         try:
             await session['gemini'].close()
         except Exception as e:
-            print(f"Gemini close error on disconnect: {e}")
+            logger.warning(f"Gemini close error on disconnect: {e}")
 
 
 def strip_markdown(text: str) -> str:
@@ -182,20 +186,20 @@ async def start_session(sid, data):
         await sio.emit('error', {'message': 'Invalid uploaded document reference.'}, to=sid)
         return
 
-    print(f"Starting session for {sid}, uid: {uid}, anonymous: {is_anonymous}, claim: {claim or '(from documents)'}")
+    logger.info(f"Starting session for {sid}, uid: {uid}, anonymous: {is_anonymous}, claim: {claim or '(from documents)'}")
 
     try:
         state = SessionState(user_claim=claim, stage=stage)
         system_prompt = build_system_prompt(claim, stage=stage)
 
-        logger = SessionLogger(
+        session_logger = SessionLogger(
             session_id=state.session_id,
             user_claim=claim,
             uid=uid,
             is_anonymous=is_anonymous,
             stage=stage,
         )
-        voice = assign_voice(state.session_id, logger)
+        voice = assign_voice(state.session_id, session_logger)
         async def on_audio(audio_b64):
             if not sessions.get(sid, {}).get('paused', False):
                 await sio.emit('agent_audio', audio_b64, to=sid)
@@ -209,17 +213,17 @@ async def start_session(sid, data):
                 state.add_turn('agent', text)
                 await sio.emit('transcript', {'speaker': 'agent', 'text': text}, to=sid)
                 try:
-                    logger.log_turn('agent', text, state.turn_count)
+                    session_logger.log_turn('agent', text, state.turn_count)
                 except Exception as e:
-                    print(f"Logging error (on_text): {e}")
+                    logger.error(f"Logging error (on_text): {e}")
 
         async def record_user_turn(text):
             state.add_turn('user', text)
             await sio.emit('transcript', {'speaker': 'user', 'text': text}, to=sid)
             try:
-                logger.log_turn('user', text, state.turn_count)
+                session_logger.log_turn('user', text, state.turn_count)
             except Exception as e:
-                print(f"Logging error (record_user_turn): {e}")
+                logger.error(f"Logging error (record_user_turn): {e}")
 
             async def _judge_turn(user_text):
                 judges = sessions.get(sid, {}).get('judges')
@@ -230,9 +234,9 @@ async def start_session(sid, data):
                     state.add_judge_update(user_text, result)
                     await sio.emit('claim_update', result, to=sid)
                     try:
-                        logger.log_judge_update(result)
+                        session_logger.log_judge_update(result)
                     except Exception as e:
-                        print(f"Logging error (_judge_turn): {e}")
+                        logger.error(f"Logging error (_judge_turn): {e}")
 
             asyncio.create_task(_judge_turn(text))
 
@@ -249,9 +253,9 @@ async def start_session(sid, data):
         async def on_interrupted():
             await sio.emit('agent_interrupted', to=sid)
             try:
-                logger.log_interruption()
+                session_logger.log_interruption()
             except Exception as e:
-                print(f"Logging error (on_interrupted): {e}")
+                logger.error(f"Logging error (on_interrupted): {e}")
 
         # 1. Load and embed documents first so RAG is ready before agent speaks
         await sio.emit('session_status', {'step': 'Loading your documents...'}, to=sid)
@@ -260,7 +264,7 @@ async def start_session(sid, data):
             doc_texts, doc_metas = await asyncio.get_event_loop().run_in_executor(
                 None, download_and_extract, document_paths
             )
-            print(f"[Session] Ingesting {len(doc_texts)} user document chunks for {uid}")
+            logger.info(f"[Session] Ingesting {len(doc_texts)} user document chunks for {uid}")
             # If user didn't type a claim, derive it from the document text
             if not claim:
                 if not doc_texts:
@@ -275,14 +279,14 @@ async def start_session(sid, data):
                         claim = claim[:MAX_CLAIM_LENGTH - 3].rstrip() + "..."
                     claim = sanitize_claim(claim)
                 except Exception as e:
-                    print(f"[Session] Summary failed: {e}")
+                    logger.error(f"[Session] Summary failed: {e}")
                     await sio.emit('error', {
                         'message': 'Could not summarize your documents. Try adding a short description above.'
                     }, to=sid)
                     return
                 state = SessionState(user_claim=claim, stage=stage)
                 system_prompt = build_system_prompt(claim, stage=stage)
-                logger = SessionLogger(
+                session_logger = SessionLogger(
                     session_id=state.session_id,
                     user_claim=claim,
                     uid=uid,
@@ -328,7 +332,7 @@ async def start_session(sid, data):
             'participant_id': participant_id,
             'is_anonymous': is_anonymous,
             'document_paths': document_paths,
-            'logger': logger,
+            'logger': session_logger,
             'record_user_turn': record_user_turn,
             'started_at': time.time(),
             'consent': True,
@@ -345,7 +349,7 @@ async def start_session(sid, data):
         await sio.emit('session_ready', {'sessionId': state.session_id}, to=sid)
     finally:
         if document_paths and sid not in sessions:
-            print(f"[start_session] Setup failed for {sid}; cleaning up uploaded files for {uid}")
+            logger.error(f"[start_session] Setup failed for {sid}; cleaning up uploaded files for {uid}")
             await asyncio.get_event_loop().run_in_executor(
                 None, delete_user_files, uid
             )
@@ -353,17 +357,17 @@ async def start_session(sid, data):
 @sio.event
 async def audio_chunk(sid, data):
     if sid not in sessions:
-        print(f"Dropping chunk — {sid} not in sessions")  # ← add
+        logger.warning(f"Dropping chunk — {sid} not in sessions")  # ← add
         return
     
     if not limiter.check_audio_chunk(sid):
-        print(f"Rate limit dropping chunk for {sid}")  # ← add
+        logger.warning(f"Rate limit dropping chunk for {sid}")  # ← add
         return
 
     try:
         audio_bytes = validate_audio_chunk(data)
     except ValueError as e:
-        print(f"Invalid audio chunk from {sid}: {e}")  # ← add
+        logger.warning(f"Invalid audio chunk from {sid}: {e}")  # ← add
         return
 
     session = sessions[sid]
@@ -376,7 +380,7 @@ async def audio_chunk(sid, data):
 
     gemini = session['gemini']
     if not gemini.running:
-        print(f"Dropping chunk — gemini not running for {sid}")
+        logger.warning(f"Dropping chunk — gemini not running for {sid}")
         return
 
     # Inject RAG context once per new user turn
@@ -431,7 +435,7 @@ async def with_retry(coro_fn, max_retries=2):
             if '429' in msg and attempt < max_retries:
                 match = re.search(r'retry in (\d+(?:\.\d+)?)s', msg, re.IGNORECASE)
                 delay = float(match.group(1)) if match else 30.0
-                print(f"429 quota hit, retrying in {delay}s...")
+                logger.warning(f"429 quota hit, retrying in {delay}s...")
                 await asyncio.sleep(delay)
             else:
                 raise e
@@ -445,7 +449,7 @@ async def end_session(sid):
     try:
         rag.delete_participant(session['participant_id'])
     except Exception as e:
-        print(f"RAG cleanup error: {e}")
+        logger.error(f"RAG cleanup error: {e}")
 
     # Delete uploaded files for anonymous users
     if session.get('is_anonymous'):
@@ -455,7 +459,7 @@ async def end_session(sid):
     try:
         await session['gemini'].close()
     except Exception as e:
-        print(f"Gemini close error: {e}")
+        logger.warning(f"Gemini close error: {e}")
 
     state = session['state']
 
@@ -472,7 +476,7 @@ async def end_session(sid):
     try:
         verdicts = await with_retry(lambda: run_judge_panel(judges, state))
     except Exception as e:
-        print(f"Judge panel failed after retries: {e}")
+        logger.error(f"Judge panel failed after retries: {e}")
 
     merged = await merge_verdicts(verdicts)
     consensus = merged.get("consensus") if merged else None
@@ -484,7 +488,7 @@ async def end_session(sid):
     try:
         report = await with_retry(lambda: generate_report(state, verdicts))
     except Exception as e:
-        print(f"Report failed after retries: {e}")
+        logger.error(f"Report failed after retries: {e}")
 
     judge_updates_list = state.to_dict()["judge_updates"]
     payload = {**report, "claim_events": judge_updates_list} if report else None
@@ -494,14 +498,14 @@ async def end_session(sid):
 
     session['logger'].finalize(consent_given=session['consent'])
     await sio.disconnect(sid)
-    print(f"Session ended. Turns: {len(state.turns)}")
+    logger.info(f"Session ended. Turns: {len(state.turns)}")
 
 @sio.event
 async def set_consent(sid, data):
     if sid not in sessions:
         return
     sessions[sid]['consent'] = data.get('consent', True)
-    print(f"Consent updated for {sid}: {sessions[sid]['consent']}")
+    logger.info(f"Consent updated for {sid}: {sessions[sid]['consent']}")
 
 
 @app.post("/session_feedback")
@@ -573,7 +577,7 @@ async def extract_claim(request: Request):
             None, download_and_extract, document_paths
         )
     except Exception as e:
-        print(f"[extract_claim] download error: {e}")
+        logger.error(f"[extract_claim] download error: {e}")
         return JSONResponse(content={"claim": ""})
 
     if not doc_texts:
@@ -605,7 +609,7 @@ async def extract_claim(request: Request):
         )
         claim_text = response.text.strip()
     except Exception as e:
-        print(f"[extract_claim] Gemini error: {e}")
+        logger.error(f"[extract_claim] Gemini error: {e}")
         return JSONResponse(content={"claim": ""})
 
     return JSONResponse(content={"claim": claim_text})

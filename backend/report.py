@@ -1,9 +1,12 @@
 import asyncio
+import logging
 
 from pydantic import BaseModel, Field
 
 from openai_client import OpenAIClient
 from prompts import REPORT_AGGREGATOR_PROMPT
+
+logger = logging.getLogger(__name__)
 
 
 # ── Report structured output (unchanged shape for frontend compat) ───
@@ -102,5 +105,5 @@ Generate a structured debrief report.
         )
         return report.model_dump()
     except (Exception, asyncio.CancelledError) as e:
-        print(f"Report generation error: {e}")
+        logger.error(f"Report generation error: {e}")
         return None

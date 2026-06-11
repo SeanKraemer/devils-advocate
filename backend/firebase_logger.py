@@ -1,7 +1,10 @@
+import logging
 import os
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
+
+logger = logging.getLogger(__name__)
 
 MOCK_SERVICES = os.getenv("MOCK_SERVICES") == "1"
 key_path = os.getenv("FIREBASE_KEY_PATH", "/secrets/firebase_key.json")
@@ -159,6 +162,6 @@ class SessionLogger:
         })
         if not consent_given:
             self.ref.delete()
-            print(f"[Firebase] Session {self.session_id} deleted because storage was disabled")
+            logger.info(f"[Firebase] Session {self.session_id} deleted because storage was disabled")
         else:
-            print(f"[Firebase] Session {self.session_id} logged")
+            logger.info(f"[Firebase] Session {self.session_id} logged")

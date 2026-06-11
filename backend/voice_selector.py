@@ -9,8 +9,11 @@ Usage in main.py:
     # then pass voice to GeminiLiveClient(voice_name=voice, ...)
 """
 
+import logging
 import random
 from firebase_logger import SessionLogger
+
+logger = logging.getLogger(__name__)
 
 # ── Available Gemini Live voices ──────────────────────────────────
 # Source: https://ai.google.dev/api/generate-content#v1beta.VoiceConfig
@@ -64,14 +67,14 @@ AVAILABLE_VOICES = [
 ]
 
 
-def assign_voice(session_id: str, logger: SessionLogger) -> str:
+def assign_voice(session_id: str, session_logger: SessionLogger) -> str:
     """
     Randomly selects a voice, logs it to the Firestore session document,
     and returns the voice name for use in GeminiLiveClient.
 
     Args:
         session_id: Firestore session document ID (used only for logging context)
-        logger:     Active SessionLogger instance for this session
+        session_logger: Active SessionLogger instance for this session
 
     Returns:
         Voice name string, e.g. "Fenrir"
@@ -83,10 +86,10 @@ def assign_voice(session_id: str, logger: SessionLogger) -> str:
     voice = random.choice(AVAILABLE_VOICES)
 
     try:
-        logger.log_voice(voice)
+        session_logger.log_voice(voice)
     except Exception as e:
         # Non-fatal — session proceeds with the chosen voice regardless
-        print(f"[VoiceSelector] Failed to log voice '{voice}' for session {session_id}: {e}")
+        logger.warning(f"[VoiceSelector] Failed to log voice '{voice}' for session {session_id}: {e}")
 
-    print(f"[VoiceSelector] Session {session_id} assigned voice: {voice}")
+    logger.info(f"[VoiceSelector] Session {session_id} assigned voice: {voice}")
     return voice
