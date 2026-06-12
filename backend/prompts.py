@@ -174,7 +174,15 @@ def build_system_prompt(user_claim: str, stage: str = "late") -> str:
         return build_early_stage_prompt(user_claim)
     return build_late_stage_prompt(user_claim)
 
+# The Gemini Live native-audio model silently stops generating (no audio, no
+# transcription) when an injected context turn gets too large — empirically
+# ~6k chars fails while 4k succeeds, so retrieved chunks are capped here.
+MAX_RAG_CONTEXT_CHARS = 4000
+
+
 def build_rag_context(rag_chunks: str) -> str:
+    if len(rag_chunks) > MAX_RAG_CONTEXT_CHARS:
+        rag_chunks = rag_chunks[:MAX_RAG_CONTEXT_CHARS].rsplit("\n", 1)[0]
     return f"""[GROUNDING CONTEXT]
    The following are real data points, benchmarks, and failure patterns relevant to this debate.
    You MUST incorporate at least one specific data point from this context in your next response.

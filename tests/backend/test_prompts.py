@@ -1,5 +1,11 @@
 # tests/backend/test_prompts.py
-from prompts import build_system_prompt, build_early_stage_prompt, build_late_stage_prompt, build_rag_context
+from prompts import (
+    MAX_RAG_CONTEXT_CHARS,
+    build_system_prompt,
+    build_early_stage_prompt,
+    build_late_stage_prompt,
+    build_rag_context,
+)
 
 
 class TestBuildSystemPromptRouting:
@@ -39,3 +45,22 @@ class TestBuildRagContext:
     def test_contains_grounding_header(self):
         context = build_rag_context("data")
         assert "GROUNDING CONTEXT" in context
+
+    def test_oversized_chunks_are_capped(self):
+        # Gemini Live native-audio goes silent on oversized context turns
+        chunks = "\n".join(f"data point {i}: " + "x" * 100 for i in range(200))
+        context = build_rag_context(chunks)
+        template_overhead = len(build_rag_context(""))
+        assert len(context) <= MAX_RAG_CONTEXT_CHARS + template_overhead
+
+    def test_cap_breaks_at_line_boundary(self):
+        lines = [f"line {i}: " + "y" * 80 for i in range(100)]
+        context = build_rag_context("\n".join(lines))
+        assert "[END GROUNDING CONTEXT]" in context
+        kept = [ln.strip() for ln in context.splitlines() if ln.strip().startswith("line ")]
+        assert kept, "expected some chunk lines to survive the cap"
+        assert all(ln in lines for ln in kept), "truncation must not cut mid-line"
+
+    def test_small_chunks_unchanged(self):
+        chunks = "a single small data point"
+        assert chunks in build_rag_context(chunks)
