@@ -51,6 +51,8 @@ class GeminiLiveClient:
         self.voice_name = voice_name
         self._user_transcript_buffer = ""
         self._agent_transcript_buffer = ""
+        self._turn_had_content = False
+        self._consecutive_empty_turns = 0
 
     async def connect(self):
         if MOCK_SERVICES:
@@ -131,6 +133,7 @@ class GeminiLiveClient:
                             if part.text and self.on_reasoning:
                                 await self.on_reasoning(part.text.strip())
                             if part.inline_data and "audio" in part.inline_data.mime_type:
+                                self._turn_had_content = True
                                 if self._user_transcript_buffer.strip() and self.on_user_text:
                                     await self.on_user_text(self._user_transcript_buffer.strip(), partial=False)
                                     self._user_transcript_buffer = ""
@@ -145,14 +148,23 @@ class GeminiLiveClient:
                     if sc.output_transcription:
                         chunk = sc.output_transcription.text or ""
                         if chunk:
+                            self._turn_had_content = True
                             self._agent_transcript_buffer += chunk
                             await self.on_text(chunk, partial=True)
                     if sc.turn_complete:
                         if self._agent_transcript_buffer.strip():
                             await self.on_text(self._agent_transcript_buffer.strip(), partial=False)
                             self._agent_transcript_buffer = ""
-                        else: 
+                        elif self._turn_had_content:
                             logger.info("turn_complete with empty transcript buffer — audio-only turn")
+                        else:
+                            # The native-audio preview model intermittently
+                            # completes a turn with no audio and no transcription.
+                            # Nudge it back to life instead of leaving the UI silent.
+                            await self._handle_empty_turn()
+                        if self._turn_had_content:
+                            self._consecutive_empty_turns = 0
+                        self._turn_had_content = False
                         if self._user_transcript_buffer.strip() and self.on_user_text:
                             await self.on_user_text(self._user_transcript_buffer.strip(), partial=False)
                             self._user_transcript_buffer = ""
@@ -169,6 +181,24 @@ class GeminiLiveClient:
         except Exception as e:
             logger.error(f"Listen error: {e}")
             self.running = False
+
+    async def _handle_empty_turn(self):
+        self._consecutive_empty_turns += 1
+        if self._consecutive_empty_turns <= 2:
+            logger.warning(
+                f"Empty model turn (no audio/transcription), nudge {self._consecutive_empty_turns}/2"
+            )
+            try:
+                await self.session.send_client_content(
+                    turns=[{"role": "user", "parts": [{"text": "Respond to my last point now — keep it brief and spoken."}]}],
+                    turn_complete=True,
+                )
+            except Exception as e:
+                logger.error(f"Nudge send error: {e}")
+        else:
+            logger.error("Model returned repeated empty turns; surfacing error to client")
+            if self.on_error:
+                await self.on_error("The debate engine went quiet. Send your point again or restart the session.")
 
     async def send_context(self, context_text: str):
         if not self.session or not self.running or not context_text.strip():

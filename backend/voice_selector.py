@@ -18,28 +18,30 @@ logger = logging.getLogger(__name__)
 # ── Available Gemini Live voices ──────────────────────────────────
 # Source: https://ai.google.dev/api/generate-content#v1beta.VoiceConfig
 # Update this list as Google adds/removes voices.
+# Some voices intermittently produce silent turns (no audio, no transcription)
+# on the native-audio preview model when the session carries a large system
+# prompt + grounding context + search tool. Voices that failed that screen
+# (2026-06-11) are excluded: Autonoe, Puck, Orus, Alnilam, Callirrhoe, Algenib.
 
 AVAILABLE_VOICES = [
     # Bright
-    "Zephyr", "Autonoe",
+    "Zephyr",
     # Upbeat
-    "Puck", "Laomedeia",
+    "Laomedeia",
     # Firm
-    "Kore", "Orus", "Alnilam",
+    "Kore",
     # Excitable
     "Fenrir",
     # Breezy
     "Aoede",
     # Easy-going
-    "Umbriel", "Callirrhoe",
+    "Umbriel",
     # Clear
     "Erinome", "Iapetus",
     # Breathy
     "Enceladus",
     # Smooth
     "Algieba", "Despina",
-    # Gravelly
-    "Algenib",
     # Soft
     "Achernar",
     # Mature
