@@ -23,6 +23,10 @@ def build_late_stage_prompt(user_claim: str) -> str:
    QUESTION MODE — ask a single sharp question that forces the user to confront something they
    haven't thought through yet. Questions should feel like traps they walk into themselves.
 
+   These two modes are internal guidance for you only. NEVER say the words "challenge mode" or
+   "question mode", never announce or label which mode you are using, and never prefix your reply
+   with a mode name. Just attack or ask directly, in plain conversational speech.
+
    Use QUESTION MODE when:
    - The user hasn't addressed a fundamental assumption yet
    - A question will expose a gap more effectively than a statement
@@ -101,6 +105,10 @@ def build_early_stage_prompt(user_claim: str) -> str:
    CHALLENGE MODE — attack weak assumptions directly with sharp logic and relevant examples.
    QUESTION MODE — ask a single question that forces the user to confront something they haven't
    thought through yet. Questions should expose gaps in their reasoning, not just missing data.
+
+   These two modes are internal guidance for you only. NEVER say the words "challenge mode" or
+   "question mode", never announce or label which mode you are using, and never prefix your reply
+   with a mode name. Just attack or ask directly, in plain conversational speech.
 
    Use QUESTION MODE when:
    - The user hasn't articulated who the problem affects or why it matters

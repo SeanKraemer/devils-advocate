@@ -181,6 +181,14 @@ class GeminiLiveClient:
         except Exception as e:
             logger.error(f"Listen error: {e}")
             self.running = False
+            # The native-audio preview model occasionally drops the stream mid-turn
+            # (e.g. a 1007 audio-content-type error). Surface it so the UI prompts a
+            # restart instead of hanging on silent dead air.
+            if self.on_error:
+                try:
+                    await self.on_error("The debate engine dropped the connection. Please end and start a new session.")
+                except Exception:
+                    pass
 
     async def _handle_empty_turn(self):
         self._consecutive_empty_turns += 1

@@ -66,6 +66,17 @@ export function useDebateSession() {
     const micVolumeRef = useRef(0)
     const preserveIdleOnDisconnectRef = useRef(false)
 
+    // Agent transcript reveal, paced to audio playback (live voice mode only).
+    // Gemini streams the full transcription almost instantly while the audio
+    // plays out in real time, so we buffer the text and reveal it in step with
+    // the spoken delivery instead of dumping it all at once.
+    const agentBufRef = useRef('')          // transcript chunks received this turn
+    const agentFinalRef = useRef(null)      // authoritative final text once turn completes
+    const agentAudioStartRef = useRef(null) // ctx.currentTime when this turn's audio began
+    const agentAudioEndRef = useRef(0)      // scheduled end time of this turn's audio
+    const agentAudioDoneRef = useRef(false) // audio playback for this turn has finished
+    const revealRafRef = useRef(null)       // requestAnimationFrame id for the reveal loop
+
     function resetLiveState() {
         micStartedRef.current = false
         isPausedRef.current = false
@@ -107,11 +118,25 @@ export function useDebateSession() {
         })
 
         socketRef.current.on('transcript', ({ speaker, text }) => {
+            if (speaker === 'agent' && !DEMO_MODE) {
+                // Hold the final agent line and let audio playback decide when to
+                // commit it, so the written transcript lands with the voice.
+                agentFinalRef.current = text
+                if (agentAudioDoneRef.current || agentAudioStartRef.current === null) {
+                    commitAgentTurn()
+                }
+                return
+            }
             setTranscript(prev => [...prev, { speaker, text }])
             setPartials(prev => ({ ...prev, [speaker]: '' }))
         })
 
         socketRef.current.on('transcript_partial', ({ speaker, text }) => {
+            if (speaker === 'agent' && !DEMO_MODE) {
+                // Buffer; the reveal loop (driven by audio progress) shows it in step.
+                agentBufRef.current += text
+                return
+            }
             setPartials(prev => ({ ...prev, [speaker]: (prev[speaker] || '') + text }))
         })
 
@@ -335,6 +360,14 @@ export function useDebateSession() {
         const startTime = Math.max(ctx.currentTime, nextAudioTimeRef.current)
         source.start(startTime)
         nextAudioTimeRef.current = startTime + buffer.duration
+        agentAudioEndRef.current = nextAudioTimeRef.current
+
+        // First audio chunk of a new agent turn → anchor the transcript reveal clock.
+        if (agentAudioStartRef.current === null) {
+            agentAudioStartRef.current = startTime
+            agentAudioDoneRef.current = false
+            startAgentReveal()
+        }
 
         activeSourcesRef.current.push(source)
         source.onended = () => {
@@ -350,7 +383,50 @@ export function useDebateSession() {
             isAgentSpeakingRef.current = false
             setIsAgentSpeaking(false)
             nextAudioTimeRef.current = 0
+            // Audio for this turn finished playing; commit the text now if the
+            // final line has already arrived (otherwise the transcript handler will).
+            agentAudioDoneRef.current = true
+            if (agentFinalRef.current !== null) {
+                commitAgentTurn()
+            }
         }, endDelay)
+    }
+
+    // Reveal the buffered agent transcript in step with audio playback progress.
+    function startAgentReveal() {
+        if (revealRafRef.current) cancelAnimationFrame(revealRafRef.current)
+        const tick = () => {
+            const ctx = audioContextRef.current
+            const start = agentAudioStartRef.current
+            const end = agentAudioEndRef.current
+            const full = agentBufRef.current
+            if (ctx && start !== null && full) {
+                const span = end - start
+                const frac = span > 0 ? Math.max(0, Math.min(1, (ctx.currentTime - start) / span)) : 1
+                const shown = full.slice(0, Math.ceil(frac * full.length))
+                setPartials(prev => (prev.agent === shown ? prev : { ...prev, agent: shown }))
+            }
+            revealRafRef.current = requestAnimationFrame(tick)
+        }
+        revealRafRef.current = requestAnimationFrame(tick)
+    }
+
+    // Move the agent's turn from the live partial into the finalized transcript.
+    function commitAgentTurn() {
+        if (revealRafRef.current) {
+            cancelAnimationFrame(revealRafRef.current)
+            revealRafRef.current = null
+        }
+        const text = (agentFinalRef.current ?? agentBufRef.current ?? '').trim()
+        agentBufRef.current = ''
+        agentFinalRef.current = null
+        agentAudioStartRef.current = null
+        agentAudioEndRef.current = 0
+        agentAudioDoneRef.current = false
+        if (text) {
+            setTranscript(prev => [...prev, { speaker: 'agent', text }])
+        }
+        setPartials(prev => ({ ...prev, agent: '' }))
     }
 
     function interruptAgent() {
@@ -366,6 +442,8 @@ export function useDebateSession() {
         if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current)
         isAgentSpeakingRef.current = false
         setIsAgentSpeaking(false)
+        // Flush whatever the agent had said so far (idempotent — no-op if nothing pending).
+        commitAgentTurn()
     }
 
     // ── PDF export ─────────────────────────────────────────────────

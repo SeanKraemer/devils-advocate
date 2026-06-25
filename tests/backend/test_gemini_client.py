@@ -76,6 +76,21 @@ class TestEmptyTurnNudge:
         assert client.session.send_client_content.await_count == 2
         on_error.assert_awaited_once()
 
+    async def test_listen_loop_crash_surfaces_error(self):
+        on_error = AsyncMock()
+        client = GeminiLiveClient("p", on_text=AsyncMock(), on_audio=AsyncMock(), on_error=on_error)
+
+        class BoomSession:
+            async def receive(self):
+                raise RuntimeError("1007 CONTENT_TYPE_AUDIO not supported")
+                yield  # pragma: no cover - makes this an async generator
+
+        client.session = BoomSession()
+        client.running = True
+        await client._listen()
+        on_error.assert_awaited_once()
+        assert client.running is False
+
     async def test_content_turn_resets_empty_counter(self):
         client = make_client([
             make_msg(turn_complete=True),                     # empty -> nudge 1
