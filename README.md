@@ -14,7 +14,8 @@ Try the public mock demo: https://devils-advocate.web.app
 
 *A full session against the hosted mock demo: pitch an idea, defend it across typed turns while the AI opponent presses on intent-vs-behavior and distribution risk, watch the judge panel update live, then hold to end and get the structured post-debate report.*
 
-<!-- VOICE-DEMO-PLACEHOLDER: after recording the spoken debate (see docs/DEMO_RECORDING_GUIDE.md), replace this comment with the GitHub user-attachment mp4 link so the video plays inline. -->
+https://github.com/user-attachments/assets/75ed10d9-a948-4dae-88e1-c9d8c27d03a5
+*Live voice debate against the Gemini opponent — IoT smart pill bottle pitch (unscripted).*
 
 The hosted demo runs in deterministic mock mode. It is safe to leave online because it does not call live Gemini/OpenAI services or write Firebase user data.
 
